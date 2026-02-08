@@ -1,4 +1,4 @@
-flask
-pymongo
 dnspython
-gunicorn
+requests
+pymongo
+flask
