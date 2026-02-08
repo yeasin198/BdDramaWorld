@@ -4,240 +4,236 @@ from pymongo import MongoClient
 from bson.objectid import ObjectId
 
 app = Flask(__name__)
-app.secret_key = "final_movie_system_ultra_key"
+app.secret_key = "final_ultra_movie_site_system"
 
-# --- MongoDB কানেকশন ---
+# --- MongoDB Connection ---
 MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://Demo270:Demo270@cluster0.ls1igsg.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 client = MongoClient(MONGO_URI)
 db = client['webseries_db']
-series_collection = db['series']
-settings_collection = db['settings']
+movies_col = db['movies']
+config_col = db['settings']
 
-# --- ডিফল্ট সেটিংস (কালার রিসেট করার জন্য) ---
+# --- ডিফল্ট সেটিংস (রিসেট লজিক) ---
 DEFAULT_CONFIG = {
     "site_name": "WebSeries BD",
     "primary_color": "#E50914",
     "bg_color": "#0b0b0b",
-    "card_bg": "#1a1a1a",
     "text_color": "#ffffff",
-    "badge_color": "#E50914",
     "lang_color": "#aaaaaa",
-    "shortener_url": "",
-    "shortener_api": "",
+    "slider_count": 5,
+    "sh_url": "",
+    "sh_api": "",
     "ads": []
 }
 
-def get_site_config():
-    s = settings_collection.find_one({"type": "config"})
-    if not s:
-        settings_collection.insert_one({"type": "config", **DEFAULT_CONFIG})
+def get_config():
+    conf = config_col.find_one({"type": "site_config"})
+    if not conf:
+        config_col.insert_one({"type": "site_config", **DEFAULT_CONFIG})
         return DEFAULT_CONFIG
-    return s
+    return conf
 
-# --- ডাইনামিক এবং অটো রেসপন্সিভ CSS ---
+# --- ডাইনামিক এবং রেসপন্সিভ CSS (Auto Mobile & Desktop Mode) ---
 def get_css(s):
     return f"""
 <style>
     :root {{ 
-        --primary: {s['primary_color']}; 
-        --bg: {s['bg_color']}; 
-        --card: {s['card_bg']}; 
-        --text: {s['text_color']}; 
-        --badge: {s['badge_color']};
-        --lang: {s['lang_color']};
+        --primary: {s['primary_color']}; --bg: {s['bg_color']}; --text: {s['text_color']}; --lang: {s['lang_color']};
     }}
     body {{ background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; margin: 0; padding: 0; overflow-x: hidden; }}
     
-    /* Header (Mobile Responsive) */
-    header {{ background: #000; padding: 15px 5%; display: flex; flex-direction: column; align-items: center; border-bottom: 2px solid var(--primary); position: sticky; top: 0; z-index: 1000; }}
+    header {{ background: #000; padding: 10px 5%; display: flex; flex-direction: column; align-items: center; border-bottom: 2px solid var(--primary); position: sticky; top: 0; z-index: 1000; }}
     @media (min-width: 768px) {{ header {{ flex-direction: row; justify-content: space-between; }} }}
     .logo {{ color: var(--primary); font-size: 24px; font-weight: bold; text-decoration: none; text-transform: uppercase; }}
     
-    .search-box {{ display: flex; background: #222; border-radius: 5px; overflow: hidden; margin: 10px 0; border: 1px solid #333; width: 100%; max-width: 450px; }}
-    .search-box input {{ border: none; background: transparent; color: white; padding: 10px; width: 100%; outline: none; }}
+    .search-box {{ display: flex; background: #222; border-radius: 5px; overflow: hidden; margin: 10px 0; border: 1px solid #333; width: 100%; max-width: 400px; }}
+    .search-box input {{ border: none; background: transparent; color: white; padding: 8px 12px; width: 100%; outline: none; }}
     .search-box button {{ background: var(--primary); border: none; color: white; padding: 0 15px; cursor: pointer; }}
-
+    
     .container {{ padding: 20px 5%; }}
     
-    /* Grid (Auto Responsive) */
-    .grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 15px; }}
-    @media (min-width: 768px) {{ .grid {{ grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 20px; }} }}
+    /* Slider */
+    .slider {{ width: 100%; height: 220px; overflow: hidden; position: relative; border-radius: 10px; margin-bottom: 20px; border: 1px solid #333; }}
+    @media (min-width: 768px) {{ .slider {{ height: 400px; }} }}
+    .slide {{ width: 100%; height: 100%; position: absolute; display: none; }}
+    .slide.active {{ display: block; }}
+    .slide img {{ width: 100%; height: 100%; object-fit: cover; filter: brightness(0.6); }}
+    .slide-info {{ position: absolute; bottom: 20px; left: 20px; z-index: 10; }}
+    .slide-info h2 {{ font-size: 20px; margin: 0; }}
 
-    /* Cards & 4 Corner Badge System */
-    .card {{ background: var(--card); border-radius: 8px; overflow: hidden; position: relative; text-decoration: none; color: white; transition: 0.3s; border: 1px solid #333; display: block; }}
+    /* Grid System */
+    .grid {{ display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }}
+    @media (min-width: 768px) {{ .grid {{ grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 20px; }} }}
+
+    .card {{ background: #151515; border-radius: 8px; overflow: hidden; position: relative; text-decoration: none; color: white; border: 1px solid #333; display: block; transition: 0.3s; }}
     .card:hover {{ transform: translateY(-5px); border-color: var(--primary); }}
     .card img {{ width: 100%; aspect-ratio: 2/3; object-fit: cover; }}
     
-    .badge-tl, .badge-tr, .badge-bl, .badge-br {{ position: absolute; background: var(--badge); color: white; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 3px; }}
-    .badge-tl {{ top: 5px; left: 5px; }}
-    .badge-tr {{ top: 5px; right: 5px; background: #000000aa; }}
-    .badge-bl {{ bottom: 40px; left: 5px; background: orange; }}
-    .badge-br {{ bottom: 40px; right: 5px; background: #27ae60; }}
+    /* 4 Corner Badge System */
+    .btl, .btr, .bbl, .bbr {{ position: absolute; padding: 2px 7px; font-size: 10px; font-weight: bold; border-radius: 3px; color: white; z-index: 10; }}
+    .btl {{ top: 5px; left: 5px; }} .btr {{ top: 5px; right: 5px; }} 
+    .bbl {{ bottom: 45px; left: 5px; }} .bbr {{ bottom: 45px; right: 5px; }}
 
-    .card-info {{ padding: 10px; text-align: center; font-size: 13px; font-weight: bold; }}
+    .card-info {{ padding: 8px; text-align: center; font-size: 13px; font-weight: bold; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }}
 
-    /* Detail Page */
-    .detail-flex {{ display: flex; flex-direction: column; gap: 20px; }}
-    @media (min-width: 768px) {{ .detail-flex {{ flex-direction: row; }} }}
-    .detail-img {{ width: 100%; max-width: 250px; border-radius: 10px; border: 1px solid #333; align-self: center; }}
-    .story {{ background: #111; padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary); margin: 15px 0; color: #ccc; line-height: 1.6; font-size: 14px; }}
+    /* Detail View */
+    .detail-container {{ max-width: 900px; margin: auto; }}
+    .detail-img {{ width: 100%; max-width: 250px; border-radius: 10px; border: 1px solid #333; display: block; margin: 0 auto 20px; }}
+    .story {{ background: #111; padding: 15px; border-radius: 8px; border-left: 4px solid var(--primary); margin: 15px 0; color: #ccc; line-height: 1.6; }}
     
-    /* Episodes */
-    .ep-box {{ background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 15px; border: 1px solid #333; }}
-    .ep-meta {{ display: flex; justify-content: space-between; font-size: 12px; color: #aaa; margin-bottom: 8px; }}
-    .btn-group {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }}
-    .btn {{ padding: 8px; border-radius: 4px; text-decoration: none; color: white; font-size: 11px; font-weight: bold; text-align: center; flex: 1; min-width: 80px; }}
+    .ep-box {{ background: #1a1a1a; padding: 15px; border-radius: 8px; margin-bottom: 10px; border: 1px solid #333; }}
+    .btn {{ padding: 10px; border-radius: 4px; text-decoration: none; color: white; font-size: 12px; font-weight: bold; text-align: center; display: inline-block; margin-right: 5px; margin-top: 5px; }}
     .dl {{ background: #27ae60; }} .st {{ background: #2980b9; }} .tg {{ background: #0088cc; }}
-    .ss-img {{ width: 100%; max-width: 200px; border-radius: 5px; margin-top: 10px; border: 1px solid #444; }}
+    
+    .ad-slot {{ margin: 20px 0; text-align: center; }}
 
-    /* Admin Interface */
-    .admin-nav {{ display: flex; flex-wrap: wrap; gap: 10px; margin: 15px 0; }}
-    .admin-nav a {{ color: white; text-decoration: none; font-size: 12px; background: #333; padding: 8px 12px; border-radius: 4px; border: 1px solid var(--primary); }}
-    .admin-table {{ width: 100%; border-collapse: collapse; }}
-    .admin-table th, .admin-table td {{ padding: 10px; border: 1px solid #333; text-align: left; font-size: 13px; }}
+    /* Admin UI */
+    .admin-nav {{ display: flex; flex-wrap: wrap; gap: 10px; margin-bottom: 20px; }}
+    .admin-nav a {{ color: white; text-decoration: none; background: #333; padding: 10px 15px; border-radius: 4px; border: 1px solid var(--primary); font-size: 13px; }}
     .form-card {{ max-width: 800px; margin: auto; background: #1a1a1a; padding: 25px; border-radius: 10px; border: 1px solid #333; }}
-    input, textarea {{ width: 100%; padding: 10px; margin: 5px 0; background: #222; color: white; border: 1px solid #444; border-radius: 5px; box-sizing: border-box; }}
-    .submit-btn {{ background: var(--primary); color: white; border: none; padding: 12px; width: 100%; cursor: pointer; font-weight: bold; border-radius: 5px; margin-top: 15px; }}
-    .reset-btn {{ background: #555; margin-top: 10px; }}
-    .ep-input-group {{ background: #262626; padding: 10px; border-radius: 5px; margin-bottom: 10px; border: 1px dashed #555; position: relative; }}
+    input, textarea, select {{ width: 100%; padding: 12px; margin: 8px 0; background: #222; color: white; border: 1px solid #444; border-radius: 5px; box-sizing: border-box; }}
+    .submit-btn {{ background: var(--primary); color: white; border: none; padding: 15px; width: 100%; cursor: pointer; font-weight: bold; border-radius: 5px; margin-top: 10px; }}
 </style>
 """
 
 # --- লিঙ্ক শর্টনার লজিক ---
-def shorten_link(config, original_url):
-    if config['shortener_url'] and config['shortener_api'] and original_url.strip():
-        # উদাহরণ: https://api.shorte.st/st?api=KEY&url=URL
-        return f"{config['shortener_url']}{config['shortener_api']}&url={original_url.strip()}"
-    return original_url.strip()
+def shorten_link(conf, url):
+    if conf['sh_url'] and conf['sh_api'] and url.strip():
+        return f"{conf['sh_url']}{conf['sh_api']}&url={url.strip()}"
+    return url.strip()
 
-# --- ইউজার প্যানেল ---
+# --- ইউজার প্যানেল রাউটস ---
 
 @app.route('/')
 def home():
-    s = get_site_config()
+    s = get_config()
     q = request.args.get('q', '')
-    movies = list(series_collection.find({"title": {"$regex": q, "$options": "i"}}).sort("_id", -1))
+    filt = {"title": {"$regex": q, "$options": "i"}} if q else {}
+    movies = list(movies_col.find(filt).sort("_id", -1))
+    slider_movies = movies[:int(s['slider_count'])]
     
     html = f"<html><head><meta name='viewport' content='width=device-width, initial-scale=1'>{get_css(s)}</head><body>"
-    html += f"<header><a href='/' class='logo'>{s['site_name']}</a><form action='/' class='search-box'><input name='q' placeholder='মুভি খুঁজুন...' value='{q}'><button>Search</button></form></header>"
+    html += f"<header><a href='/' class='logo'>{s['site_name']}</a><form action='/' class='search-box'><input name='q' placeholder='খুঁজুন...' value='{q}'><button>Search</button></form></header>"
+    
     html += "<div class='container'>"
+    # Ads (Top)
     for ad in s['ads']: html += f"<div class='ad-slot'>{ad}</div>"
+    
+    # স্লাইডার
+    if not q and slider_movies:
+        html += "<div class='slider'>"
+        for i, m in enumerate(slider_movies):
+            html += f"<div class='slide {'active' if i==0 else ''}'><a href='/movie/{m['_id']}'><img src='{m['poster']}'><div class='slide-info'><h2>{m['title']}</h2></div></a></div>"
+        html += "</div>"
+
     html += "<div class='grid'>"
     for m in movies:
-        html += f"<a href='/series/{m['_id']}' class='card'>"
-        if m.get("btl"): html += f"<div class='badge-tl'>{m['btl']}</div>"
-        if m.get("btr"): html += f"<div class='badge-tr'>{m['btr']}</div>"
-        if m.get("bbl"): html += f"<div class='badge-bl'>{m['bbl']}</div>"
-        if m.get("bbr"): html += f"<div class='badge-br'>{m['bbr']}</div>"
+        html += f"<a href='/movie/{m['_id']}' class='card'>"
+        if m.get('btl'): html += f"<div class='btl' style='background:{m.get('btl_c', '#E50914')}'>{m['btl']}</div>"
+        if m.get('btr'): html += f"<div class='btr' style='background:{m.get('btr_c', '#000000aa')}'>{m['btr']}</div>"
+        if m.get('bbl'): html += f"<div class='bbl' style='background:{m.get('bbl_c', 'orange')}'>{m['bbl']}</div>"
+        if m.get('bbr'): html += f"<div class='bbr' style='background:{m.get('bbr_c', '#27ae60')}'>{m['bbr']}</div>"
         html += f"<img src='{m['poster']}'><div class='card-info'>{m['title']} ({m['year']})</div></a>"
-    html += "</div></div></body></html>"
-    return render_template_string(html)
-
-@app.route('/series/<id>')
-def detail(id):
-    s = get_site_config()
-    m = series_collection.find_one({"_id": ObjectId(id)})
-    html = f"<html><head><meta name='viewport' content='width=device-width, initial-scale=1'>{get_css(s)}</head><body><header><a href='/' class='logo'>{s['site_name']}</a></header><div class='container'>"
-    html += f"<div class='detail-flex'><img src='{m['poster']}' class='detail-img'><div><h1>{m['title']} ({m['year']})</h1>"
-    html += f"<p>ভাষা: <span style='color:var(--lang)'>{m['language']}</span> | সাল: {m['year']}</p>"
-    html += f"<div class='story'><b>গল্প:</b><br>{m['description']}</div></div></div><hr style='border:0.1px solid #333; margin:20px 0'><h3>এপিসোড সমূহ:</h3>"
+    html += "</div></div>"
     
-    for ep in m['episodes']:
-        html += f"<div class='ep-box'><div class='ep-meta'><span>Episode: {ep['ep_no']}</span><span>Quality: {ep.get('quality', 'HD')}</span></div>"
-        if ep.get('ss'): html += f"<img src='{ep['ss']}' class='ss-img'><br>"
-        html += f"<div class='btn-group'>"
-        if ep['dl_link']: html += f"<a href='{ep['dl_link']}' class='btn dl' target='_blank'>Download</a>"
-        if ep['st_link']: html += f"<a href='{ep['st_link']}' class='btn st' target='_blank'>Stream</a>"
-        if ep['tg_link']: html += f"<a href='{ep['tg_link']}' class='btn tg' target='_blank'>Telegram</a>"
-        html += "</div></div>"
-    html += "</div></body></html>"
-    return render_template_string(html)
+    return render_template_string(html + """<script>
+        let slides = document.querySelectorAll('.slide'); let current = 0;
+        if(slides.length > 1) { setInterval(() => { slides[current].classList.remove('active'); current = (current + 1) % slides.length; slides[current].classList.add('active'); }, 4000); }
+    </script></body></html>""")
 
-# --- অ্যাডমিন প্যানেল ---
+@app.route('/movie/<id>')
+def detail(id):
+    s = get_config()
+    m = movies_col.find_one({"_id": ObjectId(id)})
+    html = f"<html><head><meta name='viewport' content='width=device-width, initial-scale=1'>{get_css(s)}</head><body><header><a href='/' class='logo'>{s['site_name']}</a></header><div class='container detail-container'>"
+    html += f"<img src='{m['poster']}' class='detail-img'><h1>{m['title']} ({m['year']})</h1>"
+    html += f"<p>ভাষা: <span style='color:var(--lang)'>{m['language']}</span></p><div class='story'>{m['description']}</div><hr><h3>ইপিসোড সমূহ:</h3>"
+    for ep in m['episodes']:
+        html += f"<div class='ep-box'><strong>Ep: {ep['ep_no']} - {ep['q']}</strong><br>"
+        if ep['dl']: html += f"<a href='{ep['dl']}' class='btn dl' target='_blank'>Download</a>"
+        if ep['st']: html += f"<a href='{ep['st']}' class='btn st' target='_blank'>Stream</a>"
+        if ep['tg']: html += f"<a href='{ep['tg']}' class='btn tg' target='_blank'>Telegram</a>"
+        html += "</div>"
+    return render_template_string(html + "</div></body></html>")
+
+# --- এডমিন সেকশন রাউটস ---
 
 @app.route('/admin')
-def admin_dashboard():
-    s = get_site_config()
+def admin():
+    s = get_config()
     q = request.args.get('q', '')
-    movies = list(series_collection.find({"title": {"$regex": q, "$options": "i"}}).sort("_id", -1))
-    html = f"<html><head>{get_css(s)}</head><body><header><a href='/admin' class='logo'>Admin Panel</a></header><div class='container'>"
-    html += "<div class='admin-nav'><a href='/admin/add'>+ Add Movie</a><a href='/admin/settings'>⚙ Settings & Ads</a><a href='/' style='background:red'>View Site</a></div>"
-    html += "<table class='admin-table'><tr><th>Poster</th><th>Title</th><th>Action</th></tr>"
+    filt = {"title": {"$regex": q, "$options": "i"}} if q else {}
+    movies = list(movies_col.find(filt).sort("_id", -1))
+    html = f"<html><head>{get_css(s)}</head><body><header><a href='/admin' class='logo'>Admin Panel</a><form action='/admin' class='search-box'><input name='q' placeholder='মুভি খুঁজুন...' value='{q}'><button>Search</button></form></header><div class='container'>"
+    html += "<div class='admin-nav'><a href='/admin/add'>+ Add Movie</a><a href='/admin/settings'>⚙ Site Settings</a><a href='/' style='background:red'>View Site</a></div>"
+    html += "<table border='1' width='100%' style='border-collapse:collapse; color:white'><tr><th>Title</th><th>Action</th></tr>"
     for m in movies:
-        html += f"<tr><td><img src='{m['poster']}' width='40'></td><td>{m['title']}</td><td><a href='/admin/edit/{m['_id']}' style='color:orange'>Edit</a> | <form action='/admin/delete/{m['_id']}' method='POST' style='display:inline'><button style='color:red; background:none; border:none; cursor:pointer'>Delete</button></form></td></tr>"
+        html += f"<tr><td>{m['title']}</td><td><a href='/admin/edit/{m['_id']}' style='color:orange'>Edit</a> | <form action='/admin/delete/{m['_id']}' method='POST' style='display:inline'><button style='color:red; background:none; border:none; cursor:pointer'>Delete</button></form></td></tr>"
     return render_template_string(html + "</table></div></body></html>")
 
 @app.route('/admin/settings', methods=['GET', 'POST'])
 def admin_settings():
-    s = get_site_config()
+    s = get_config()
     if request.method == 'POST':
         if 'reset' in request.form:
-            settings_collection.update_one({"type": "config"}, {"$set": DEFAULT_CONFIG})
+            config_col.update_one({"type": "site_config"}, {"$set": DEFAULT_CONFIG})
         else:
-            settings_collection.update_one({"type": "config"}, {"$set": {
-                "site_name": request.form.get('site_name'),
-                "primary_color": request.form.get('p_color'),
-                "bg_color": request.form.get('b_color'),
-                "card_bg": request.form.get('c_color'),
-                "text_color": request.form.get('t_color'),
-                "badge_color": request.form.get('badge_color'),
-                "lang_color": request.form.get('lang_color'),
-                "shortener_url": request.form.get('sh_url'),
-                "shortener_api": request.form.get('sh_api'),
-                "ads": [ad for ad in request.form.getlist('ads[]') if ad.strip()]
+            config_col.update_one({"type": "site_config"}, {"$set": {
+                "site_name": request.form.get('site_name'), "primary_color": request.form.get('p_c'), "bg_color": request.form.get('b_c'),
+                "text_color": request.form.get('t_c'), "lang_color": request.form.get('l_c'), "slider_count": request.form.get('sc'),
+                "sh_url": request.form.get('sh_u'), "sh_api": request.form.get('sh_a'), "ads": request.form.getlist('ads[]')
             }})
         return redirect('/admin/settings')
-
-    html = f"<html><head>{get_css(s)}</head><body><header><a href='/admin' class='logo'>Settings</a></header><div class='container'><div class='form-card'>"
-    html += "<form method='POST'><h3>সাইট এবং কালার সেটিংস</h3><label>সাইট নেম:</label><input name='site_name' value='"+s['site_name']+"'>"
-    html += "<div style='display:grid; grid-template-columns: 1fr 1fr; gap:10px;'>"
-    for k, v in [('p_color','primary_color'),('b_color','bg_color'),('c_color','card_bg'),('t_color','text_color'),('badge_color','badge_color'),('lang_color','lang_color')]:
-        html += f"<div><label>{k}:</label><input type='color' name='{k}' value='{s[v]}'></div>"
-    html += "</div><hr><h3>লিঙ্ক শর্টনার সেটিংস</h3><label>Base URL (API Link):</label><input name='sh_url' value='"+s['shortener_url']+"' placeholder='https://short.me/api?api='><label>API Key:</label><input name='sh_api' value='"+s['shortener_api']+"'><hr><h3>বিজ্ঞাপন ও রিসেট</h3>"
-    html += "<div id='ad-list'>"
-    for ad in s['ads']: html += f"<textarea name='ads[]' rows='2'>{ad}</textarea>"
-    html += "</div><button type='button' onclick='addAd()'>+ Add Ad Slot</button><button class='submit-btn'>Save Settings</button><button name='reset' value='1' class='submit-btn reset-btn' onclick='return confirm(\"রিসেট করবেন?\")'>Reset to Default Colors</button></form></div></div>"
-    return render_template_string(html + "<script>function addAd(){document.getElementById('ad-list').insertAdjacentHTML('beforeend', '<textarea name=\"ads[]\" rows=\"2\"></textarea>')}</script></body></html>")
+    
+    html = f"<html><head>{get_css(s)}</head><body><header><a href='/admin' class='logo'>Settings</a></header><div class='container'><div class='form-card'><form method='POST'>"
+    html += f"সাইট নাম: <input name='site_name' value='{s['site_name']}'>"
+    html += f"থিম কালার: <input type='color' name='p_c' value='{s['primary_color']}'> ব্যাকগ্রাউন্ড: <input type='color' name='b_c' value='{s['bg_color']}'>"
+    html += f"টেক্সট কালার: <input type='color' name='t_c' value='{s['text_color']}'> ভাষা কালার: <input type='color' name='l_c' value='{s['lang_color']}'>"
+    html += f"স্লাইডার মুভি সংখ্যা: <input type='number' name='sc' value='{s['slider_count']}'>"
+    html += f"Link Shortener API URL: <input name='sh_u' value='{s['sh_url']}' placeholder='https://short.com/api?api='> Key: <input name='sh_a' value='{s['sh_api']}'>"
+    html += "<h4>আনলিমিটেড বিজ্ঞাপন</h4><div id='ad-area'>"
+    for ad in s.get('ads', []): html += f"<textarea name='ads[]' rows='3'>{ad}</textarea>"
+    html += "</div><button type='button' onclick='addAd()'>+ Add Ad Slot</button>"
+    html += "<button class='submit-btn'>Save All Settings</button><button name='reset' class='submit-btn' style='background:#555; margin-top:10px'>Reset Colors & Settings</button></form></div></div>"
+    return render_template_string(html + "<script>function addAd(){document.getElementById('ad-area').insertAdjacentHTML('beforeend', '<textarea name=\"ads[]\" rows=\"3\"></textarea>')}</script></body></html>")
 
 @app.route('/admin/add', methods=['GET', 'POST'])
 @app.route('/admin/edit/<id>', methods=['GET', 'POST'])
-def manage_movie(id=None):
-    s = get_site_config()
-    m = series_collection.find_one({"_id": ObjectId(id)}) if id else None
+def save_movie(id=None):
+    s = get_config()
+    m = movies_col.find_one({"_id": ObjectId(id)}) if id else None
     if request.method == 'POST':
-        ep_nos = request.form.getlist('ep_no[]')
-        qs = request.form.getlist('q[]')
-        ss_links = request.form.getlist('ss[]')
-        dls = request.form.getlist('dl[]')
-        sts = request.form.getlist('st[]')
-        tgs = request.form.getlist('tg[]')
+        en, qu, dl, st, tg = request.form.getlist('en[]'), request.form.getlist('q[]'), request.form.getlist('dl[]'), request.form.getlist('st[]'), request.form.getlist('tg[]')
         eps = []
-        for i in range(len(ep_nos)):
-            eps.append({"ep_no": ep_nos[i], "quality": qs[i], "ss": ss_links[i], 
-                        "dl_link": shorten_link(s, dls[i]), "st_link": shorten_link(s, sts[i]), "tg_link": shorten_link(s, tgs[i])})
-        data = {"title": request.form.get('t'), "year": request.form.get('y'), "language": request.form.get('l'), "poster": request.form.get('p'), 
-                "btl": request.form.get('btl'), "btr": request.form.get('btr'), "bbl": request.form.get('bbl'), "bbr": request.form.get('bbr'),
-                "description": request.form.get('d'), "episodes": eps}
-        if id: series_collection.update_one({"_id": ObjectId(id)}, {"$set": data})
-        else: series_collection.insert_one(data)
+        for i in range(len(en)):
+            eps.append({"ep_no": en[i], "q": qu[i], "dl": shorten_link(s, dl[i]), "st": shorten_link(s, st[i]), "tg": shorten_link(s, tg[i])})
+        data = {
+            "title": request.form.get('t'), "year": request.form.get('y'), "language": request.form.get('l'), "poster": request.form.get('p'), "description": request.form.get('d'),
+            "btl": request.form.get('btl'), "btl_c": request.form.get('btl_c'), "btr": request.form.get('btr'), "btr_c": request.form.get('btr_c'),
+            "bbl": request.form.get('bbl'), "bbl_c": request.form.get('bbl_c'), "bbr": request.form.get('bbr'), "bbr_c": request.form.get('bbr_c'),
+            "episodes": eps
+        }
+        if id: movies_col.update_one({"_id": ObjectId(id)}, {"$set": data})
+        else: movies_col.insert_one(data)
         return redirect('/admin')
-
-    html = f"<html><head>{get_css(s)}</head><body><header><a href='/admin' class='logo'>Manage</a></header><div class='container'><div class='form-card'><form method='POST'>"
-    html += f"<h3>মুভি তথ্য</h3><input name='t' placeholder='মুভির নাম' value='{m['title'] if m else ''}' required><div style='display:flex; gap:10px'><input name='y' placeholder='সাল' value='{m['year'] if m else ''}'><input name='l' placeholder='ভাষা' value='{m['language'] if m else ''}'></div>"
-    html += f"<input name='p' placeholder='পোস্টার লিঙ্ক' value='{m['poster'] if m else ''}' required>"
-    html += f"<div style='display:grid; grid-template-columns: 1fr 1fr; gap:5px'><input name='btl' placeholder='Badge TL' value='{m['btl'] if m else ''}'><input name='btr' placeholder='Badge TR' value='{m['btr'] if m else ''}'><input name='bbl' placeholder='Badge BL' value='{m['bbl'] if m else ''}'><input name='bbr' placeholder='Badge BR' value='{m['bbr'] if m else ''}'></div>"
-    html += f"<textarea name='d' placeholder='গল্প'>{m['description'] if m else ''}</textarea><h3>এপিসোড সমূহ</h3><div id='ep-area'>"
+    
+    html = f"<html><head>{get_css(s)}</head><body><header><a href='/admin' class='logo'>Save Movie</a></header><div class='container'><div class='form-card'><form method='POST'>"
+    html += f"<input name='t' placeholder='মুভির নাম' value='{m['title'] if m else ''}' required><div style='display:flex; gap:5px'><input name='y' placeholder='সাল' value='{m['year'] if m else ''}'><input name='l' placeholder='ভাষা' value='{m['language'] if m else ''}'></div>"
+    html += f"<input name='p' placeholder='পোস্টার লিঙ্ক' value='{m['poster'] if m else ''}' required><textarea name='d' placeholder='গল্প'>{m['description'] if m else ''}</textarea>"
+    html += "<h4>৪ কোণায় ৪ ব্যাজ এবং কালার</h4>"
+    for b in [('btl', 'Top Left'), ('btr', 'Top Right'), ('bbl', 'Bottom Left'), ('bbr', 'Bottom Right')]:
+        html += f"{b[1]}: <input name='{b[0]}' value='{m.get(b[0], '')}' style='width:30%'> <input type='color' name='{b[0]}_c' value='{m.get(b[0]+'_c', '#e50914')}' style='width:15%'> "
+    html += "<h4>ইপিসোড সমূহ</h4><div id='e-area'>"
     if m:
-        for e in m['episodes']: html += f"<div class='ep-input-group'><input name='ep_no[]' value='{e['ep_no']}' placeholder='নং'><input name='q[]' value='{e.get('quality','')}' placeholder='Quality'><input name='ss[]' value='{e.get('ss','')}' placeholder='Screenshot'><input name='dl[]' value='{e['dl_link']}' placeholder='DL'><input name='st[]' value='{e['st_link']}' placeholder='ST'><input name='tg[]' value='{e['tg_link']}' placeholder='TG'></div>"
-    else: html += "<div class='ep-input-group'><input name='ep_no[]' placeholder='নং'><input name='q[]' placeholder='Quality'><input name='ss[]' placeholder='Screenshot'><input name='dl[]' placeholder='DL'><input name='st[]' placeholder='ST'><input name='tg[]' placeholder='TG'></div>"
-    html += "</div><button type='button' onclick='addEp()'>+ Add Episode</button><button class='submit-btn'>Save Movie</button></form></div></div>"
-    return render_template_string(html + "<script>function addEp(){document.getElementById('ep-area').insertAdjacentHTML('beforeend', '<div class=\"ep-input-group\"><input name=\"ep_no[]\" placeholder=\"নং\"><input name=\"q[]\" placeholder=\"Quality\"><input name=\"ss[]\" placeholder=\"Screenshot\"><input name=\"dl[]\" placeholder=\"DL\"><input name=\"st[]\" placeholder=\"ST\"><input name=\"tg[]\" placeholder=\"TG\"></div>')}</script></body></html>")
+        for e in m['episodes']: html += f"<div style='border:1px dashed #555;padding:10px;margin-bottom:5px'><input name='en[]' value='{e['ep_no']}' placeholder='নং'><input name='q[]' value='{e['q']}' placeholder='Quality'><input name='dl[]' value='{e['dl']}' placeholder='DL'><input name='st[]' value='{e['st']}' placeholder='ST'><input name='tg[]' value='{e['tg']}' placeholder='TG'></div>"
+    else: html += "<div style='border:1px dashed #555;padding:10px;margin-bottom:5px'><input name='en[]' placeholder='Ep নং'><input name='q[]' placeholder='Quality'><input name='dl[]' placeholder='Download Link'><input name='st[]' placeholder='Stream Link'><input name='tg[]' placeholder='Telegram Link'></div>"
+    html += "</div><button type='button' onclick='addE()' style='width:100%'>+ Add More Episode</button><button class='submit-btn'>Publish Movie</button></form></div></div>"
+    return render_template_string(html + "<script>function addE(){document.getElementById('e-area').insertAdjacentHTML('beforeend', '<div style=\"border:1px dashed #555;padding:10px;margin-bottom:5px\"><input name=\"en[]\" placeholder=\"Ep নং\"><input name=\"q[]\" placeholder=\"Quality\"><input name=\"dl[]\" placeholder=\"DL\"><input name=\"st[]\" placeholder=\"ST\"><input name=\"tg[]\" placeholder=\"TG\"></div>')}</script></body></html>")
 
 @app.route('/admin/delete/<id>', methods=['POST'])
-def delete_movie(id):
-    series_collection.delete_one({"_id": ObjectId(id)})
+def delete(id):
+    movies_col.delete_one({"_id": ObjectId(id)})
     return redirect('/admin')
 
 if __name__ == '__main__':
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host='0.0.0.0', port=port)
+    app.run(host='0.0.0.0', port=int(os.environ.get("PORT", 5000)))
