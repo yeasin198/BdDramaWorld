@@ -7,7 +7,7 @@ app = Flask(__name__)
 
 # --- ডাটাবেস কানেকশন ---
 # Render/Koyeb-এর Environment Variable থেকে MONGO_URI নেবে
-MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://admin:admin123@cluster0.mongodb.net/myDatabase?retryWrites=true&w=majority")
+MONGO_URI = os.environ.get("MONGO_URI", "mongodb+srv://Demo270:Demo270@cluster0.ls1igsg.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0")
 client = MongoClient(MONGO_URI)
 db = client['webseries_db']
 series_collection = db['series']
