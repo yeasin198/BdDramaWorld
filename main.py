@@ -3,7 +3,6 @@ import requests
 from flask import Flask, render_template_string, request, redirect, url_for, flash
 from pymongo import MongoClient
 from bson.objectid import ObjectId
-from bson.errors import InvalidId
 
 app = Flask(__name__)
 app.secret_key = "movie_pro_ultra_unlimited_v10_fixed"
@@ -15,10 +14,20 @@ db = client.movie_database
 movies_col = db.movies
 settings_col = db.settings
 
-# --- Helper Functions ---
+# --- Context Processor (সব পেজে সেটিংস অটোমেটিক পাঠানোর জন্য) ---
+@app.context_processor
+def inject_global_vars():
+    cfg = settings_col.find_one({"type": "config"}) or {
+        "limit": 15, 
+        "slider_limit": 5, 
+        "api": "",
+        "site_name": "MoviePro"
+    }
+    ads = list(settings_col.find({"type": "ad_unit"}))
+    return dict(cfg=cfg, ads=ads)
 
+# --- Helper Functions ---
 def shorten_link(url):
-    """লিঙ্ক শর্টনার API সাপোর্ট"""
     if not url or not url.strip(): return ""
     try:
         cfg = settings_col.find_one({"type": "config"})
@@ -31,19 +40,7 @@ def shorten_link(url):
         print(f"Shortener Error: {e}")
     return url
 
-def get_site_settings():
-    """কনফিগারেশন এবং অ্যাড লোড করা"""
-    cfg = settings_col.find_one({"type": "config"}) or {
-        "limit": 15, 
-        "slider_limit": 5, 
-        "api": "",
-        "site_name": "MoviePro"
-    }
-    ads = list(settings_col.find({"type": "ad_unit"}))
-    return cfg, ads
-
 # --- HTML TEMPLATES ---
-
 COMMON_HEAD = """
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -57,7 +54,6 @@ COMMON_HEAD = """
     .glass { background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(15px); border: 1px solid rgba(255,255,255,0.05); }
     .corner-tag { position: absolute; padding: 2px 8px; font-size: 10px; font-weight: bold; border-radius: 4px; z-index: 10; }
     .movie-card:hover img { transform: scale(1.1); transition: 0.6s cubic-bezier(0.4, 0, 0.2, 1); }
-    ::-webkit-scrollbar { display: none; }
 </style>
 """
 
@@ -79,16 +75,15 @@ NAVBAR_HTML = """
 """
 
 # --- USER ROUTES ---
-
 @app.route('/')
 def index():
-    cfg, ads = get_site_settings()
     q = request.args.get('q')
     cat = request.args.get('cat')
     filter_q = {}
     if q: filter_q["name"] = {"$regex": q, "$options": "i"}
     if cat: filter_q["category"] = cat
     
+    cfg = inject_global_vars()['cfg']
     slider_movies = list(movies_col.find({"in_slider": "on"}).sort("_id", -1).limit(int(cfg.get('slider_limit', 5))))
     movies = list(movies_col.find(filter_q).sort("_id", -1).limit(int(cfg.get('limit', 15))))
     categories = movies_col.distinct("category")
@@ -127,14 +122,13 @@ def index():
             </div>
         </div>
         <script>new Swiper(".mySwiper", { loop: true, autoplay: true });</script>
-    </body></html>""", cfg=cfg, ads=ads, movies=movies, slider_movies=slider_movies, categories=categories)
+    </body></html>""")
 
 @app.route('/movie/<id>')
 def movie_details(id):
     try:
         movie = movies_col.find_one({"_id": ObjectId(id)})
         if not movie: return redirect('/')
-        cfg, ads = get_site_settings()
     except: return redirect('/')
     
     return render_template_string("""
@@ -156,10 +150,12 @@ def movie_details(id):
                     <h3 class="text-xl font-black mb-4 uppercase">Episode: {{ ep.ep_no }}</h3>
                     <div class="grid md:grid-cols-2 gap-4">
                         {% for link in ep.links %}
-                        <div class="bg-black/40 p-4 rounded-xl flex flex-wrap gap-2">
-                            <span class="w-full text-[10px] text-gray-500 font-bold uppercase">{{ link.quality }}</span>
-                            <a href="{{ link.stream }}" target="_blank" class="bg-blue-600 px-4 py-2 rounded-lg text-xs font-bold">STREAM</a>
-                            <a href="{{ link.download }}" target="_blank" class="bg-green-600 px-4 py-2 rounded-lg text-xs font-bold">DOWNLOAD</a>
+                        <div class="bg-black/40 p-4 rounded-xl">
+                            <span class="text-[10px] text-gray-500 font-bold uppercase">{{ link.quality }}</span>
+                            <div class="flex gap-2 mt-2">
+                                <a href="{{ link.stream }}" target="_blank" class="bg-blue-600 px-4 py-2 rounded-lg text-xs font-bold">STREAM</a>
+                                <a href="{{ link.download }}" target="_blank" class="bg-green-600 px-4 py-2 rounded-lg text-xs font-bold">DOWNLOAD</a>
+                            </div>
                         </div>
                         {% endfor %}
                     </div>
@@ -167,23 +163,24 @@ def movie_details(id):
                 {% endfor %}
             </div>
         </div>
-    </body></html>""", movie=movie, cfg=cfg, ads=ads)
+    </body></html>""", movie=movie)
 
 # --- ADMIN ROUTES ---
-
 @app.route('/admin')
 def admin_dash():
     q = request.args.get('q')
     filter_q = {"name": {"$regex": q, "$options": "i"}} if q else {}
     movies = list(movies_col.find(filter_q).sort("_id", -1))
-    cfg, _ = get_site_settings()
     return render_template_string("""
     <!DOCTYPE html><html><head>""" + COMMON_HEAD + """</head>
     <body class="p-6">""" + NAVBAR_HTML + """
         <div class="max-w-6xl mx-auto mt-10">
-            <div class="flex justify-between mb-10 items-center">
+            <div class="flex justify-between items-center mb-10">
                 <h1 class="text-2xl font-black italic uppercase">Admin Dashboard</h1>
-                <a href="/admin/add" class="bg-green-600 px-6 py-3 rounded-xl font-bold">+ ADD MOVIE</a>
+                <div class="flex gap-4">
+                    <a href="/admin/settings" class="bg-gray-700 px-6 py-3 rounded-xl font-bold">SETTINGS</a>
+                    <a href="/admin/add" class="bg-green-600 px-6 py-3 rounded-xl font-bold">+ ADD MOVIE</a>
+                </div>
             </div>
             <div class="grid gap-4">
                 {% for m in movies %}
@@ -200,12 +197,11 @@ def admin_dash():
                 {% endfor %}
             </div>
         </div>
-    </body></html>""", movies=movies, cfg=cfg)
+    </body></html>""", movies=movies)
 
 @app.route('/admin/add', methods=['GET', 'POST'])
 @app.route('/admin/edit/<id>', methods=['GET', 'POST'])
 def manage_movie(id=None):
-    cfg, _ = get_site_settings()
     movie = None
     if id:
         try: movie = movies_col.find_one({"_id": ObjectId(id)})
@@ -241,21 +237,23 @@ def manage_movie(id=None):
             <form method="POST" class="glass p-8 rounded-3xl h-max">
                 <h2 class="text-xl font-black mb-6 italic text-blue-500 uppercase">Movie Details</h2>
                 <div class="space-y-4">
-                    <input name="name" value="{{ movie.name if movie else '' }}" placeholder="Name" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800" required>
-                    <input name="poster" value="{{ movie.poster if movie else '' }}" placeholder="Poster URL" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800">
+                    <input name="name" value="{{ movie.name if movie else '' }}" placeholder="Name" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 text-white" required>
+                    <input name="poster" value="{{ movie.poster if movie else '' }}" placeholder="Poster URL" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 text-white">
                     <div class="grid grid-cols-2 gap-4">
-                        <input name="category" value="{{ movie.category if movie else '' }}" placeholder="Category" class="bg-black/40 p-4 rounded-xl border border-gray-800">
-                        <input name="year" value="{{ movie.year if movie else '' }}" placeholder="Year" class="bg-black/40 p-4 rounded-xl border border-gray-800">
+                        <input name="category" value="{{ movie.category if movie else '' }}" placeholder="Category" class="bg-black/40 p-4 rounded-xl border border-gray-800 text-white">
+                        <input name="year" value="{{ movie.year if movie else '' }}" placeholder="Year" class="bg-black/40 p-4 rounded-xl border border-gray-800 text-white">
                     </div>
-                    <input name="lang" value="{{ movie.lang if movie else '' }}" placeholder="Language" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800">
+                    <input name="lang" value="{{ movie.lang if movie else '' }}" placeholder="Language" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 text-white">
                     <div class="grid grid-cols-2 gap-4">
-                        {% for i in range(1, 5) %}
-                        <input name="tag{{i}}" value="{{ movie['tag'~i] if movie else '' }}" placeholder="Tag {{i}}" class="bg-black/40 p-3 rounded-lg border border-gray-800 text-xs">
-                        {% endfor %}
+                        <input name="tag1" value="{{ movie.tag1 if movie else '' }}" placeholder="Tag 1" class="bg-black/40 p-3 rounded-lg border border-gray-800 text-white text-xs">
+                        <input name="tag2" value="{{ movie.tag2 if movie else '' }}" placeholder="Tag 2" class="bg-black/40 p-3 rounded-lg border border-gray-800 text-white text-xs">
+                        <input name="tag3" value="{{ movie.tag3 if movie else '' }}" placeholder="Tag 3" class="bg-black/40 p-3 rounded-lg border border-gray-800 text-white text-xs">
+                        <input name="tag4" value="{{ movie.tag4 if movie else '' }}" placeholder="Tag 4" class="bg-black/40 p-3 rounded-lg border border-gray-800 text-white text-xs">
                     </div>
-                    <textarea name="story" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 h-32">{{ movie.story if movie else '' }}</textarea>
+                    <textarea name="story" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 text-white h-32">{{ movie.story if movie else '' }}</textarea>
                     <label class="flex items-center gap-2"><input type="checkbox" name="in_slider" {{ 'checked' if movie and movie.in_slider == 'on' else '' }}> Show in Slider</label>
                     <button name="save_movie" class="w-full bg-blue-600 py-4 rounded-xl font-black">SAVE MOVIE</button>
+                    <a href="/admin" class="block text-center text-xs text-gray-500 uppercase mt-4">Back to Dashboard</a>
                 </div>
             </form>
 
@@ -265,23 +263,24 @@ def manage_movie(id=None):
                     <h2 class="text-xl font-black mb-6 uppercase text-green-500">{{ 'Edit' if ep_to_edit else 'Add' }} Episode</h2>
                     <input type="hidden" name="mid" value="{{ movie._id }}">
                     <input type="hidden" name="idx" value="{{ ep_idx if ep_idx is not None else '' }}">
-                    <input name="ep_no" value="{{ ep_to_edit.ep_no if ep_to_edit else '' }}" placeholder="Episode No" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 mb-4" required>
+                    <input name="ep_no" value="{{ ep_to_edit.ep_no if ep_to_edit else '' }}" placeholder="Episode No" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 mb-4 text-white" required>
                     
                     {% for i in range(1, 3) %}
-                    {% set link = ep_to_edit.links[i-1] if (ep_to_edit and ep_to_edit.links|length >= i) else None %}
+                    {% set link = ep_to_edit.links[i-1] if (ep_to_edit and ep_to_edit.links and ep_to_edit.links|length >= i) else None %}
                     <div class="bg-black/20 p-4 rounded-xl mb-4 border border-white/5">
                         <p class="text-[10px] text-gray-500 uppercase font-black mb-2">Slot {{ i }}</p>
-                        <input name="q{{i}}_n" value="{{ link.quality if link else '' }}" placeholder="Quality (720p)" class="w-full bg-black/40 p-2 rounded-lg border border-gray-800 mb-2 text-xs">
-                        <input name="q{{i}}_s" value="{{ link.stream if link else '' }}" placeholder="Stream Link" class="w-full bg-black/40 p-2 rounded-lg border border-gray-800 mb-2 text-xs">
-                        <input name="q{{i}}_d" value="{{ link.download if link else '' }}" placeholder="Download Link" class="w-full bg-black/40 p-2 rounded-lg border border-gray-800 mb-2 text-xs">
-                        <input name="q{{i}}_t" value="{{ link.telegram if link else '' }}" placeholder="Telegram Link" class="w-full bg-black/40 p-2 rounded-lg border border-gray-800 text-xs">
+                        <input name="q{{i}}_n" value="{{ link.quality if link else '' }}" placeholder="Quality (720p)" class="w-full bg-black/40 p-2 rounded-lg border border-gray-800 mb-2 text-white text-xs">
+                        <input name="q{{i}}_s" value="{{ link.stream if link else '' }}" placeholder="Stream Link" class="w-full bg-black/40 p-2 rounded-lg border border-gray-800 mb-2 text-white text-xs">
+                        <input name="q{{i}}_d" value="{{ link.download if link else '' }}" placeholder="Download Link" class="w-full bg-black/40 p-2 rounded-lg border border-gray-800 mb-2 text-white text-xs">
+                        <input name="q{{i}}_t" value="{{ link.telegram if link else '' }}" placeholder="Telegram Link" class="w-full bg-black/40 p-2 rounded-lg border border-gray-800 text-white text-xs">
                     </div>
                     {% endfor %}
                     <button class="w-full bg-green-600 py-4 rounded-xl font-black">SAVE EPISODE</button>
+                    {% if ep_to_edit %}<a href="/admin/edit/{{ movie._id }}" class="block text-center text-xs text-gray-500 mt-2">CANCEL EDIT</a>{% endif %}
                 </form>
 
                 <div class="glass p-6 rounded-3xl">
-                    <h3 class="font-bold text-sm text-gray-500 mb-4 uppercase">Episode List</h3>
+                    <h3 class="font-bold text-sm text-gray-500 mb-4 uppercase italic">Episodes List</h3>
                     {% for ep in movie.episodes %}
                     <div class="flex justify-between items-center bg-black/40 p-4 rounded-xl mb-2">
                         <span class="font-bold uppercase">EPISODE {{ ep.ep_no }}</span>
@@ -295,7 +294,7 @@ def manage_movie(id=None):
             </div>
             {% endif %}
         </div>
-    </body></html>""", movie=movie, ep_to_edit=ep_to_edit, ep_idx=ep_idx, cfg=cfg)
+    </body></html>""", movie=movie, ep_to_edit=ep_to_edit, ep_idx=ep_idx)
 
 @app.route('/admin/episode/save', methods=['POST'])
 def save_episode():
@@ -354,35 +353,41 @@ def settings():
         elif 'del_ad' in request.form:
             settings_col.delete_one({"_id": ObjectId(request.form['ad_id'])})
         return redirect('/admin/settings')
-    cfg, ads = get_site_settings()
     return render_template_string("""
     <!DOCTYPE html><html><head>""" + COMMON_HEAD + """</head>
     <body class="p-6">""" + NAVBAR_HTML + """
         <div class="max-w-4xl mx-auto mt-10 space-y-10">
             <form method="POST" class="glass p-8 rounded-3xl">
-                <h2 class="text-xl font-black mb-6 uppercase">Settings</h2>
+                <h2 class="text-xl font-black mb-6 uppercase italic">Global Settings</h2>
                 <div class="space-y-4">
-                    <input name="site_name" value="{{ cfg.site_name }}" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800">
-                    <input name="api" value="{{ cfg.api }}" placeholder="Shortener API" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800">
+                    <input name="site_name" value="{{ cfg.site_name }}" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 text-white">
+                    <input name="api" value="{{ cfg.api }}" placeholder="Shortener API" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 text-xs text-blue-400">
                     <div class="grid grid-cols-2 gap-4">
-                        <input name="limit" type="number" value="{{ cfg.limit }}" class="bg-black/40 p-4 rounded-xl border border-gray-800">
-                        <input name="slider_limit" type="number" value="{{ cfg.slider_limit }}" class="bg-black/40 p-4 rounded-xl border border-gray-800">
+                        <input name="limit" type="number" value="{{ cfg.limit }}" class="bg-black/40 p-4 rounded-xl border border-gray-800 text-white">
+                        <input name="slider_limit" type="number" value="{{ cfg.slider_limit }}" class="bg-black/40 p-4 rounded-xl border border-gray-800 text-white">
                     </div>
-                    <button name="save_config" class="w-full bg-blue-600 py-4 rounded-xl font-black">SAVE</button>
+                    <button name="save_config" class="w-full bg-blue-600 py-4 rounded-xl font-black">SAVE CONFIG</button>
                 </div>
             </form>
             <div class="glass p-8 rounded-3xl">
-                <h2 class="text-xl font-black mb-6 uppercase">Ads</h2>
-                <form method="POST" class="space-y-4">
-                    <select name="pos" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800">
-                        <option value="top">Top</option><option value="bottom">Bottom</option><option value="popup">Popup</option>
+                <h2 class="text-xl font-black mb-6 uppercase italic">Ads Inventory</h2>
+                <form method="POST" class="space-y-4 mb-6">
+                    <select name="pos" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 text-white">
+                        <option value="top">Top Banner</option><option value="bottom">Bottom Banner</option><option value="popup">Popup Script</option>
                     </select>
-                    <textarea name="code" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 h-20"></textarea>
-                    <button name="add_ad" class="w-full bg-yellow-500 text-black py-4 rounded-xl font-black">ADD AD</button>
+                    <textarea name="code" class="w-full bg-black/40 p-4 rounded-xl border border-gray-800 text-white h-24" placeholder="Ad Code"></textarea>
+                    <button name="add_ad" class="w-full bg-yellow-600 text-black py-4 rounded-xl font-black">ADD AD UNIT</button>
                 </form>
+                {% for ad in ads %}
+                <div class="flex justify-between items-center bg-black/40 p-4 rounded-xl mb-2">
+                    <span class="text-xs uppercase font-bold">{{ ad.position }}</span>
+                    <form method="POST"><input type="hidden" name="ad_id" value="{{ ad._id }}"><button name="del_ad" class="text-red-500 font-bold text-xs">REMOVE</button></form>
+                </div>
+                {% endfor %}
             </div>
+            <a href="/admin" class="block text-center text-xs text-gray-500 uppercase">Back to Dashboard</a>
         </div>
-    </body></html>""", cfg=cfg, ads=ads)
+    </body></html>""")
 
 if __name__ == '__main__':
     app.run(debug=True)
