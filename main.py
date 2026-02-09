@@ -20,7 +20,6 @@ try:
     client = MongoClient(MONGO_URI, tlsCAFile=ca, serverSelectionTimeoutMS=5000)
     db = client['app_hub_production_ultimate_system']
     
-    # Collections
     apps_col = db['apps']
     users_col = db['users']
     ads_col = db['ads']
@@ -61,9 +60,8 @@ BASE_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
     
-    /* THEME SYSTEM */
-    :root { --bg: #f8fafc; --text: #0f172a; --card: #ffffff; --border: #e2e8f0; --glass: rgba(255, 255, 255, 0.9); }
-    .dark-mode { --bg: #0f172a; --text: #f8fafc; --card: #1e293b; --border: #334155; --glass: rgba(15, 23, 42, 0.9); }
+    :root { --bg: #f8fafc; --text: #0f172a; --card: #ffffff; --border: #e2e8f0; --glass: rgba(255, 255, 255, 0.9); --title: #1e293b; }
+    .dark-mode { --bg: #0f172a; --text: #f8fafc; --card: #1e293b; --border: #334155; --glass: rgba(15, 23, 42, 0.9); --title: #ffffff; }
 
     body { font-family: 'Plus Jakarta Sans', sans-serif; background-color: var(--bg); color: var(--text); overflow-x: hidden; transition: 0.3s ease; }
     .glass-nav { background: var(--glass); backdrop-filter: blur(12px); border-bottom: 1px solid var(--border); }
@@ -71,12 +69,12 @@ BASE_CSS = """
     .pro-card { background: var(--card); border: 1px solid var(--border); border-radius: 2rem; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }
     .pro-card:hover { transform: translateY(-8px); box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.2); border-color: #6366f1; }
     
-    /* POSTER BADGE STYLE */
-    .app-badge { position: absolute; top: 12px; right: 12px; background: #6366f1; color: white; padding: 4px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; z-index: 10; text-transform: uppercase; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
+    /* POSTER BADGE */
+    .app-badge { position: absolute; top: 12px; right: 12px; background: #6366f1; color: white !important; padding: 4px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; z-index: 10; text-transform: uppercase; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
 
     .sidebar-link { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-radius: 18px; font-weight: 600; color: #94a3b8; transition: 0.3s; }
     .sidebar-active { background: #6366f1 !important; color: white !important; box-shadow: 0 10px 20px -5px rgba(99, 102, 241, 0.4); }
-    .btn-main { background: #6366f1; color: white; padding: 12px 28px; border-radius: 18px; font-weight: 800; display: inline-flex; align-items: center; gap: 8px; transition: 0.3s; }
+    .btn-main { background: #6366f1; color: white !important; padding: 12px 28px; border-radius: 18px; font-weight: 800; display: inline-flex; align-items: center; gap: 8px; transition: 0.3s; }
     
     input, textarea, select { border: 2px solid var(--border); border-radius: 18px; padding: 14px 18px; outline: none; background: var(--card); color: var(--text); width: 100%; transition: 0.3s; }
     input:focus { border-color: #6366f1; }
@@ -85,10 +83,11 @@ BASE_CSS = """
     @media (min-width: 768px) { .swiper { height: 450px; } }
     .swiper-slide img { width: 100%; height: 100%; object-fit: cover; border-radius: 2.5rem; }
     
+    .text-title { color: var(--title); }
     .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
     
-    /* Translator Custom Styles */
-    #google_translate_element { height: 38px; overflow: hidden; border-radius: 12px; }
+    /* Translator Styles Hidden */
+    #google_translate_element { display: none; }
     .goog-te-banner-frame.skiptranslate { display: none !important; }
     body { top: 0px !important; }
 </style>
@@ -109,17 +108,14 @@ BASE_LAYOUT = """
             <div class="flex items-center justify-between w-full lg:w-auto">
                 <a href="/" class="flex items-center gap-3">
                     <img src="{{ site.logo }}" class="w-10 h-10 rounded-xl shadow-lg">
-                    <span class="text-2xl font-black text-slate-900 dark:text-white tracking-tighter uppercase italic">{{ site.name }}</span>
+                    <span class="text-2xl font-black text-title tracking-tighter uppercase italic">{{ site.name }}</span>
                 </a>
                 <div class="flex items-center gap-4 lg:hidden">
                      <button onclick="toggleTheme()" class="w-10 h-10 rounded-xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-indigo-600"><i id="themeIconMobile" class="fas fa-moon"></i></button>
                 </div>
             </div>
 
-            <div class="flex flex-col md:flex-row items-center gap-4 w-full max-w-2xl">
-                <!-- Translation Widget -->
-                <div id="google_translate_element"></div>
-                
+            <div class="flex items-center gap-4 w-full max-w-2xl">
                 <form action="/" method="GET" class="flex bg-slate-100 dark:bg-slate-800 rounded-2xl px-5 py-2 w-full border border-slate-200 dark:border-slate-700">
                     <input type="text" name="q" placeholder="Search apps, games, tools..." class="bg-transparent border-none p-0 w-full text-sm font-semibold outline-none text-slate-800 dark:text-white" value="{{ q if q }}">
                     <button type="submit"><i class="fas fa-search text-indigo-600 text-lg"></i></button>
@@ -135,7 +131,6 @@ BASE_LAYOUT = """
 
     <div class="{% if is_admin_route %}flex flex-col lg:flex-row min-h-screen{% else %}container mx-auto px-6 py-10{% endif %}">
         {% if is_admin_route %}
-        <!-- ADMIN SIDEBAR -->
         <div class="w-full lg:w-80 bg-slate-950 text-slate-400 p-8 flex flex-col lg:h-screen lg:sticky lg:top-0">
             <div class="flex items-center gap-4 mb-10 border-b border-slate-900 pb-8">
                 <img src="{{ site.logo }}" class="w-10 h-10 rounded-xl">
@@ -158,7 +153,6 @@ BASE_LAYOUT = """
                 <a href="/logout" class="text-red-500 font-black flex items-center gap-3"><i class="fas fa-power-off"></i> LOGOUT SYSTEM</a>
             </div>
         </div>
-        <!-- ADMIN CONTENT AREA -->
         <div class="flex-1 p-6 lg:p-12 bg-white dark:bg-slate-900 transition-colors duration-300">
             {% with messages = get_flashed_messages() %}{% if messages %}{% for m in messages %}
             <div class="bg-indigo-600 text-white p-5 rounded-3xl mb-10 shadow-xl flex justify-between items-center animate-bounce">
@@ -169,7 +163,6 @@ BASE_LAYOUT = """
             {% block admin_content %}{% endblock %}
         </div>
         {% else %}
-        <!-- USER CONTENT AREA -->
         <div class="min-h-[80vh]">
             {% block content %}{% endblock %}
         </div>
@@ -190,16 +183,14 @@ BASE_LAYOUT = """
             <div>
                 <h4 class="text-white font-bold mb-8 uppercase text-sm tracking-widest">Legal & Policy</h4>
                 <div class="flex flex-col gap-4 font-bold text-sm">
-                    <a href="/p/privacy" class="hover:text-indigo-400 transition">Privacy Policy</a>
-                    <a href="/p/terms" class="hover:text-indigo-400 transition">Terms of Service</a>
-                    <a href="/p/dmca" class="hover:text-indigo-400 transition">DMCA Notice</a>
+                    <a href="/p/privacy" class="hover:text-white transition">Privacy Policy</a>
+                    <a href="/p/terms" class="hover:text-white transition">Terms of Service</a>
                 </div>
             </div>
             <div>
-                <h4 class="text-white font-bold mb-8 uppercase text-sm tracking-widest">Multi-Lingual</h4>
+                <h4 class="text-white font-bold mb-8 uppercase text-sm tracking-widest">Support</h4>
                 <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800">
-                    <span class="text-[10px] block mb-1 uppercase font-black text-indigo-400">Night Mode Enabled</span>
-                    <span class="text-white font-black">All Servers Operational</span>
+                    <span class="text-white font-black text-xs">Day & Night Mode Optimized</span>
                 </div>
             </div>
         </div>
@@ -209,9 +200,9 @@ BASE_LAYOUT = """
     </footer>
     {% endif %}
 
+    <div id="google_translate_element"></div>
+
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
-    
-    <!-- Translation Init -->
     <script type="text/javascript">
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({pageLanguage: 'en', includedLanguages: 'en,bn,hi'}, 'google_translate_element');
@@ -234,13 +225,13 @@ BASE_LAYOUT = """
         }
 
         document.addEventListener('DOMContentLoaded', function () {
-            // Theme Local Storage
             if(localStorage.getItem('theme') === 'dark') {
                 document.getElementById('pageBody').classList.add('dark-mode');
-                if(document.getElementById('themeIcon')) document.getElementById('themeIcon').className = 'fas fa-sun';
-                if(document.getElementById('themeIconMobile')) document.getElementById('themeIconMobile').className = 'fas fa-sun';
+                const icon = document.getElementById('themeIcon');
+                const iconMobile = document.getElementById('themeIconMobile');
+                if(icon) icon.className = 'fas fa-sun';
+                if(iconMobile) iconMobile.className = 'fas fa-sun';
             }
-
             const swiper = new Swiper('.swiper', {
                 loop: true, autoplay: { delay: 4000, disableOnInteraction: false },
                 pagination: { el: '.swiper-pagination', clickable: true },
@@ -258,7 +249,6 @@ BASE_LAYOUT = """
 def home():
     site = get_site_info()
     q = request.args.get('q', '')
-    
     all_media = list(media_col.find().sort('_id', -1))
     all_categories = list(categories_col.find().sort('name', 1))
     
@@ -297,7 +287,7 @@ def home():
     {% for section in home_data %}
     <div class="mb-20">
         <div class="flex justify-between items-end mb-10 border-b-4 border-slate-50 dark:border-slate-800 pb-5">
-            <h2 class="text-3xl font-black uppercase italic tracking-tighter text-slate-900 dark:text-white">{{ section.cat_name }}</h2>
+            <h2 class="text-3xl font-black uppercase italic tracking-tighter text-title">{{ section.cat_name }}</h2>
             <a href="/category/{{ section.cat_name }}" class="text-indigo-600 font-black text-xs uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/30 px-6 py-2 rounded-full">View All</a>
         </div>
         <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 gap-8">
@@ -305,10 +295,9 @@ def home():
             <a href="/app/{{app._id}}" class="pro-card p-6 flex flex-col items-center text-center group">
                 {% if app.badge %}<div class="app-badge">{{ app.badge }}</div>{% endif %}
                 <div class="relative mb-6">
-                    <img src="{{app.logo}}" class="w-24 h-24 rounded-[2.5rem] shadow-2xl group-hover:rotate-6 transition duration-500 border-4 border-white dark:border-slate-700">
-                    <span class="absolute -top-3 -right-3 bg-indigo-600 text-white text-[9px] font-black px-3 py-1.5 rounded-full shadow-lg">PREMIUM</span>
+                    <img src="{{app.logo}}" class="w-24 h-24 rounded-[2rem] shadow-2xl group-hover:rotate-6 transition duration-500 border-4 border-white dark:border-slate-700">
                 </div>
-                <h3 class="font-black text-slate-800 dark:text-white text-base mb-4 line-clamp-1 uppercase italic">{{app.name}}</h3>
+                <h3 class="font-black text-title text-base mb-4 line-clamp-1 uppercase italic">{{app.name}}</h3>
                 <div class="w-full bg-slate-950 dark:bg-indigo-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest group-hover:bg-indigo-700 transition">DOWNLOAD</div>
             </a>
             {% endfor %}
@@ -327,8 +316,8 @@ def details(id):
     <div class="bg-white dark:bg-slate-800 rounded-[4rem] p-10 lg:p-20 shadow-2xl flex flex-col lg:flex-row gap-16 items-center lg:items-start border border-slate-100 dark:border-slate-700">
         <img src="{{app.logo}}" class="w-64 h-64 rounded-[4rem] shadow-2xl border-[12px] border-slate-50 dark:border-slate-900">
         <div class="flex-1 text-center lg:text-left">
-            <h1 class="text-5xl lg:text-7xl font-black mb-8 uppercase italic tracking-tighter text-slate-900 dark:text-white">{{app.name}}</h1>
-            <p class="text-slate-500 dark:text-slate-300 text-2xl mb-12 font-medium leading-relaxed">"{{app.info}}"</p>
+            <h1 class="text-5xl lg:text-7xl font-black mb-8 uppercase italic tracking-tighter text-title">{{app.name}}</h1>
+            <p class="text-slate-500 dark:text-slate-400 text-2xl mb-12 font-medium leading-relaxed">"{{app.info}}"</p>
             <div class="flex flex-wrap justify-center lg:justify-start gap-5 mb-12">
                 <div class="bg-indigo-600 text-white px-10 py-3 rounded-full font-black text-xs uppercase shadow-xl">{{app.category}}</div>
                 <div class="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 px-10 py-3 rounded-full font-black text-xs uppercase italic">Ver: {{app.version}}</div>
@@ -346,7 +335,7 @@ def legal_pages(slug):
     content = get_legal_content(slug)
     page_html = f"""
     <div class="max-w-4xl mx-auto bg-white dark:bg-slate-800 p-12 lg:p-24 rounded-[4rem] shadow-2xl border dark:border-slate-700">
-        <h1 class="text-5xl font-black mb-10 uppercase italic tracking-tighter text-indigo-600 border-b-4 border-slate-50 dark:border-slate-900 pb-6 text-slate-900 dark:text-white">{{slug}} Policy</h1>
+        <h1 class="text-5xl font-black mb-10 uppercase italic tracking-tighter text-indigo-600 border-b-4 border-slate-50 dark:border-slate-900 pb-6 text-title">{{slug}} Policy</h1>
         <div class="text-slate-600 dark:text-slate-400 text-xl leading-loose whitespace-pre-line font-medium">{content}</div>
     </div>
     """
@@ -375,7 +364,7 @@ def admin_dashboard():
             <div class="text-7xl font-black mb-2">{{ stats.cats }}</div>
             <p class="font-bold uppercase opacity-60 text-xs tracking-[0.2em]">Active Categories</p>
         </div>
-        <div class="bg-emerald-500 p-10 rounded-[3rem] text-white shadow-2xl">
+        <div class="bg-emerald-50 p-10 rounded-[3rem] text-white shadow-2xl">
             <div class="text-7xl font-black mb-2">{{ stats.media }}</div>
             <p class="font-bold uppercase opacity-60 text-xs tracking-[0.2em]">Media Banners</p>
         </div>
@@ -440,7 +429,6 @@ def admin_apps():
     site = get_site_info()
     cats = list(categories_col.find().sort('name', 1))
     
-    # ADMIN SEARCH LOGIC
     admin_q = request.args.get('admin_q', '')
     query = {}
     if admin_q:
@@ -450,7 +438,7 @@ def admin_apps():
         apps_col.insert_one({
             "name": request.form.get('name'), "logo": request.form.get('logo'),
             "category": request.form.get('category'), "version": request.form.get('version'),
-            "badge": request.form.get('badge'), 
+            "badge": request.form.get('badge'),
             "info": request.form.get('info'), "download_link": request.form.get('download_link'),
             "created_at": datetime.now()
         })
@@ -464,25 +452,23 @@ def admin_apps():
         <form method="POST" class="lg:col-span-4 bg-slate-50 p-10 rounded-[3rem] border-2 border-slate-200 h-fit space-y-4">
             <h2 class="font-black text-indigo-600 uppercase italic">Publish New App</h2>
             <input name="name" placeholder="Application Title" required>
-            <input name="logo" placeholder="Logo Link (URL)" required>
+            <input name="logo" placeholder="Logo Link" required>
             <input name="badge" placeholder="Badge (MOD, PREMIUM, NEW)">
             <select name="category" required>
                 <option value="" disabled selected>Select Category</option>
                 {% for c in cats %}<option value="{{c.name}}">{{c.name}}</option>{% endfor %}
             </select>
-            <input name="version" placeholder="Version (e.g. 2.1.0)">
+            <input name="version" placeholder="Version">
             <textarea name="info" placeholder="Description" class="h-32" required></textarea>
-            <input name="download_link" placeholder="Direct Download URL" required>
+            <input name="download_link" placeholder="Download URL" required>
             <button class="btn-main w-full py-5 text-lg">PUBLISH APP</button>
         </form>
         
         <div class="lg:col-span-8 space-y-6">
-            <!-- SEARCH BAR IN ADMIN -->
             <form action="/admin/apps" method="GET" class="flex bg-slate-100 rounded-3xl px-6 py-2 border border-slate-200 shadow-inner">
                 <input type="text" name="admin_q" placeholder="Search Apps by Name..." class="bg-transparent border-none p-0 w-full text-sm font-semibold outline-none" value="{{ admin_q }}">
                 <button type="submit"><i class="fas fa-search text-indigo-600 text-lg"></i></button>
             </form>
-
             <div class="bg-white border-2 rounded-[3rem] overflow-hidden shadow-xl overflow-x-auto">
                 <table class="w-full text-left">
                     <thead class="bg-slate-950 text-white text-[11px] uppercase font-bold tracking-widest">
@@ -581,8 +567,8 @@ def admin_media():
                     <img src="{{ m.url }}" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
                 </div>
                 <div class="p-6">
-                    <h3 class="font-black uppercase text-sm truncate mb-1 italic text-slate-800">{{ m.title }}</h3>
-                    <a href="/admin/del-media/{{ m._id }}" class="text-red-500 font-black text-xs hover:underline" onclick="return confirm('Remove media?')">REMOVE SLIDE</a>
+                    <h3 class="font-black uppercase text-sm truncate mb-1 italic">{{ m.title }}</h3>
+                    <a href="/admin/del-media/{{ m._id }}" class="text-red-500 font-black text-xs hover:underline" onclick="return confirm('Remove media?')">REMOVE FROM SLIDER</a>
                 </div>
             </div>
             {% endfor %}
@@ -591,7 +577,7 @@ def admin_media():
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, media_list=media_list, is_admin_route=True, active="media")
 
-# --- ADMIN: ADS ---
+# --- ADMIN: ADS & LAYOUT ---
 
 @app.route('/admin/ads', methods=['GET', 'POST'])
 def admin_ads():
@@ -606,8 +592,8 @@ def admin_ads():
     <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">Ads Placement</h1>
     <div class="grid lg:grid-cols-2 gap-12">
         <form method="POST" class="bg-slate-50 p-10 rounded-[3rem] border-2 border-slate-200 space-y-5">
-            <input name="name" placeholder="Ad Unit Name" required>
-            <textarea name="code" placeholder="Ad HTML/JS Code" class="h-64 font-mono text-sm" required></textarea>
+            <input name="name" placeholder="Ad Spot Name" required>
+            <textarea name="code" placeholder="Paste Ad HTML/JS Code Here" class="h-64 font-mono text-sm" required></textarea>
             <button class="btn-main w-full py-5">DEPLOY AD CODE</button>
         </form>
         <div class="space-y-6">
@@ -621,8 +607,6 @@ def admin_ads():
     </div>
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, ads_list=ads_list, is_admin_route=True, active="ads")
-
-# --- ADMIN: LAYOUT & BRANDING ---
 
 @app.route('/admin/layout', methods=['GET', 'POST'])
 def admin_layout():
@@ -638,64 +622,63 @@ def admin_layout():
             }}, upsert=True)
         elif l_type == 'legal':
             settings_col.update_one({"type": "legal_page", "page": request.form.get('page')}, {"$set": {"text": request.form.get('text')}}, upsert=True)
-        flash("Branding and layout settings saved.")
+        flash("Layout and branding settings saved.")
         return redirect('/admin/layout')
     
     content = """
-    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">Layout Settings</h1>
+    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">Site Customization</h1>
     <div class="grid lg:grid-cols-2 gap-12">
-        <!-- BRANDING FORM -->
         <form method="POST" class="bg-white p-10 rounded-[3rem] border-2 shadow-xl space-y-5 h-fit">
             <input type="hidden" name="l_type" value="branding">
-            <h2 class="font-black text-indigo-600 uppercase border-b pb-4 italic">Branding</h2>
+            <h2 class="font-black uppercase italic text-indigo-600 border-b pb-4">Branding & Socials</h2>
             <div class="grid grid-cols-2 gap-4">
-                <input name="name" value="{{site.name}}">
-                <input name="logo" value="{{site.logo}}">
+                <input name="name" value="{{site.name}}" placeholder="Site Name">
+                <input name="logo" value="{{site.logo}}" placeholder="Logo URL">
             </div>
-            <input name="title" value="{{site.title}}">
+            <input name="title" value="{{site.title}}" placeholder="Browser Tab Title">
             <textarea name="desc" class="h-24">{{site.desc}}</textarea>
-            <input name="copyright" value="{{site.copyright}}">
+            <input name="copyright" value="{{site.copyright}}" placeholder="Copyright Text">
             <div class="grid grid-cols-2 gap-4">
-                <input name="fb" value="{{site.fb}}" placeholder="Facebook">
-                <input name="ig" value="{{site.ig}}" placeholder="Instagram">
+                <input name="fb" value="{{site.fb}}" placeholder="Facebook Link">
+                <input name="ig" value="{{site.ig}}" placeholder="Instagram Link">
             </div>
-            <button class="btn-main w-full py-5">SAVE BRANDING</button>
+            <button class="btn-main w-full py-5">SAVE ALL BRANDING</button>
         </form>
-        <!-- LEGAL PAGES FORM -->
-        <form method="POST" class="bg-slate-50 p-10 rounded-[3rem] border-2 border-dashed space-y-5 h-fit">
+        <form method="POST" class="bg-slate-50 p-10 rounded-[3rem] border-2 border-dashed border-slate-200 space-y-5 h-fit">
             <input type="hidden" name="l_type" value="legal">
-            <h2 class="font-black text-emerald-600 uppercase border-b pb-4 italic">Legal Editor</h2>
+            <h2 class="font-black uppercase italic text-emerald-600 border-b pb-4">Legal Page Editor</h2>
             <select name="page" required>
                 <option value="privacy">Privacy Policy</option>
                 <option value="terms">Terms of Service</option>
                 <option value="dmca">DMCA Takedown</option>
             </select>
-            <textarea name="text" placeholder="Paste legal text here..." class="h-80 font-medium"></textarea>
-            <button class="btn-main w-full py-5 bg-emerald-600">UPDATE CONTENT</button>
+            <textarea name="text" placeholder="Paste policy text here..." class="h-80 font-medium"></textarea>
+            <button class="btn-main w-full py-5 bg-emerald-600">UPDATE LEGAL CONTENT</button>
         </form>
     </div>
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, is_admin_route=True, active="layout")
 
-# --- ADMIN: SYSTEM SETTINGS ---
+# --- ADMIN: SETTINGS ---
 
 @app.route('/admin/settings', methods=['GET', 'POST'])
 def admin_settings():
     if not session.get('logged_in'): return redirect('/admin-gate')
     if request.method == 'POST':
         settings_col.update_one({"type": "shortener"}, {"$set": {"url": request.form.get('url'), "api": request.form.get('api')}}, upsert=True)
-        flash("API Settings Updated.")
+        flash("API Configuration Saved.")
         return redirect('/admin/settings')
     
     cfg = get_shortener()
     site = get_site_info()
     content = """
-    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">System API</h1>
+    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">System API Settings</h1>
     <div class="bg-slate-950 p-16 rounded-[4rem] shadow-2xl border-4 border-slate-900">
+        <h2 class="text-emerald-400 font-black uppercase mb-8 italic tracking-widest text-sm">Universal Link Shortener (API)</h2>
         <form method="POST" class="space-y-8">
-            <input name="url" value="{{cfg.url}}" placeholder="Shortener Domain (e.g. gplinks.in)" class="bg-slate-900 border-none text-white font-bold py-6 text-xl">
-            <input name="api" value="{{cfg.api}}" placeholder="API Secret Key" class="bg-slate-900 border-none text-white font-bold py-6 text-xl">
-            <button class="bg-emerald-500 text-black w-full py-6 rounded-[2rem] font-black text-2xl hover:bg-white transition duration-500">UPDATE GLOBAL CONFIG</button>
+            <input name="url" value="{{cfg.url}}" placeholder="Domain" class="bg-slate-900 border-none text-white font-bold py-6 text-xl">
+            <input name="api" value="{{cfg.api}}" placeholder="API Token" class="bg-slate-900 border-none text-white font-bold py-6 text-xl">
+            <button class="bg-emerald-500 text-black w-full py-6 rounded-[2rem] font-black text-2xl">UPDATE GLOBAL API</button>
         </form>
     </div>
     """
@@ -714,30 +697,19 @@ def login():
             session['logged_in'] = True; return redirect('/admin/dashboard')
         if check_password_hash(admin['password'], pw):
             session['logged_in'] = True; return redirect('/admin/dashboard')
-        flash("Invalid Authorization Key.")
-    return render_template_string(f"""
-    <!DOCTYPE html><html><head>{BASE_CSS}</head>
-    <body class="bg-slate-100 flex items-center justify-center min-h-screen p-6">
-        <form method="POST" class="bg-white p-12 rounded-[4rem] shadow-2xl w-full max-w-md text-center border-4 border-white">
-            <img src="{site['logo']}" class="w-24 h-24 rounded-[2rem] mx-auto mb-10 shadow-xl border-4 border-slate-50">
-            <h2 class="text-4xl font-black mb-10 uppercase italic tracking-tighter">System Lock</h2>
-            <input type="password" name="password" class="text-center font-black text-3xl mb-8 p-6" placeholder="••••••••" required>
-            <button class="bg-slate-950 text-white w-full py-6 rounded-3xl font-black text-xl shadow-2xl hover:bg-indigo-600 transition">UNLOCK SYSTEM</button>
-            <a href="/forgot" class="block mt-8 text-xs font-bold text-slate-400 uppercase">Forgot Password?</a>
-        </form>
-    </body></html>
-    """)
+        flash("Denied.")
+    return render_template_string(f"<!DOCTYPE html><html><head>{BASE_CSS}</head><body class='bg-slate-100 flex items-center justify-center min-h-screen'><form method='POST' class='bg-white p-12 rounded-[4rem] shadow-2xl w-full max-w-md text-center border-4 border-white'><img src='{site['logo']}' class='w-24 h-24 rounded-[2rem] mx-auto mb-10 shadow-xl border-4 border-slate-50'><h2 class='text-4xl font-black mb-10 uppercase italic tracking-tighter'>System Lock</h2><input type='password' name='password' class='text-center font-black text-3xl mb-8 p-6' placeholder='••••' required><button class='bg-slate-950 text-white w-full py-6 rounded-3xl font-black text-xl shadow-2xl hover:bg-indigo-600 transition'>UNLOCK SYSTEM</button></form></body></html>")
 
 @app.route('/forgot', methods=['GET', 'POST'])
 def forgot():
     if request.method == 'POST':
         if request.form.get('key') == RECOVERY_KEY:
             users_col.update_one({"username": "admin"}, {"$set": {"password": generate_password_hash(request.form.get('pw'))}}, upsert=True)
-            flash("System password has been reset.")
+            flash("System password reset.")
             return redirect('/admin-gate')
-    return render_template_string(f"<!DOCTYPE html><html><head>{BASE_CSS}</head><body class='bg-slate-100 flex items-center justify-center min-h-screen'><form method='POST' class='bg-white p-12 rounded-[3.5rem] shadow-xl w-full max-w-md space-y-6'><h2 class='font-black uppercase italic text-center'>Emergency Recovery</h2><input name='key' placeholder='Recovery Key' required><input type='password' name='pw' placeholder='New Password' required><button class='btn-main w-full py-5 text-xl'>RESET NOW</button></form></body></html>")
+    return render_template_string(f"<!DOCTYPE html><html><head>{BASE_CSS}</head><body class='bg-slate-100 flex items-center justify-center min-h-screen'><form method='POST' class='bg-white p-12 rounded-[3.5rem] shadow-xl w-full max-w-md space-y-6'><h2 class='font-black uppercase italic text-center'>Reset Key</h2><input name='key' placeholder='Recovery Key' required><input type='password' name='pw' placeholder='New Password' required><button class='btn-main w-full py-5 text-xl'>RESET NOW</button></form></body></html>")
 
-# --- CORE LOGIC: DOWNLOADS & DELETE ---
+# --- SYSTEM CORE ---
 
 @app.route('/get/<id>')
 def download_process(id):
@@ -757,29 +729,23 @@ def download_process(id):
 @app.route('/admin/del-cat/<id>')
 def delete_cat(id):
     if not session.get('logged_in'): return redirect('/admin-gate')
-    categories_col.delete_one({"_id": ObjectId(id)})
-    flash("Category deleted.")
-    return redirect('/admin/categories')
+    categories_col.delete_one({"_id": ObjectId(id)}); return redirect('/admin/categories')
 
 @app.route('/admin/del-media/<id>')
 def delete_media(id):
     if not session.get('logged_in'): return redirect('/admin-gate')
-    media_col.delete_one({"_id": ObjectId(id)})
-    flash("Slider item removed.")
-    return redirect('/admin/media')
+    media_col.delete_one({"_id": ObjectId(id)}); return redirect('/admin/media')
 
 @app.route('/del/<type>/<id>')
 def delete_entry(type, id):
     if not session.get('logged_in'): return redirect('/admin-gate')
     if type == 'app': apps_col.delete_one({"_id": ObjectId(id)})
     if type == 'ad': ads_col.delete_one({"_id": ObjectId(id)})
-    flash("Entry has been permanently removed.")
     return redirect(request.referrer)
 
 @app.route('/logout')
 def logout(): session.clear(); return redirect('/')
 
-# --- START SERVER ---
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
