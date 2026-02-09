@@ -13,7 +13,6 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET", "super_high_secure_long_secret_key_v100_final_2024")
 RECOVERY_KEY = os.environ.get("RECOVERY_KEY", "admin@2024")
 
-# --- MONGODB CONNECTION ---
 import certifi
 
 # --- MONGODB CONNECTION ---
@@ -36,7 +35,6 @@ try:
     print("MongoDB Connected Successfully!")
 except Exception as e:
     print(f"DATABASE CONNECTION ERROR: {e}")
-
 # --- DYNAMIC SITE HELPERS ---
 def get_site_info():
     info = settings_col.find_one({"type": "site_info"})
