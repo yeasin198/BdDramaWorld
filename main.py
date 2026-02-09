@@ -61,6 +61,7 @@ BASE_CSS = """
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
     
+    /* THEME SYSTEM */
     :root { --bg: #f8fafc; --text: #0f172a; --card: #ffffff; --border: #e2e8f0; --glass: rgba(255, 255, 255, 0.9); }
     .dark-mode { --bg: #0f172a; --text: #f8fafc; --card: #1e293b; --border: #334155; --glass: rgba(15, 23, 42, 0.9); }
 
@@ -70,7 +71,7 @@ BASE_CSS = """
     .pro-card { background: var(--card); border: 1px solid var(--border); border-radius: 2rem; transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1); position: relative; overflow: hidden; }
     .pro-card:hover { transform: translateY(-8px); box-shadow: 0 25px 50px -12px rgba(99, 102, 241, 0.2); border-color: #6366f1; }
     
-    /* POSTER BADGE */
+    /* POSTER BADGE STYLE */
     .app-badge { position: absolute; top: 12px; right: 12px; background: #6366f1; color: white; padding: 4px 12px; border-radius: 8px; font-size: 10px; font-weight: 800; z-index: 10; text-transform: uppercase; box-shadow: 0 4px 12px rgba(99, 102, 241, 0.3); }
 
     .sidebar-link { display: flex; align-items: center; gap: 12px; padding: 14px 20px; border-radius: 18px; font-weight: 600; color: #94a3b8; transition: 0.3s; }
@@ -86,8 +87,8 @@ BASE_CSS = """
     
     .line-clamp-1 { display: -webkit-box; -webkit-line-clamp: 1; -webkit-box-orient: vertical; overflow: hidden; }
     
-    /* Translator Styles */
-    #google_translate_element { height: 38px; overflow: hidden; }
+    /* Translator Custom Styles */
+    #google_translate_element { height: 38px; overflow: hidden; border-radius: 12px; }
     .goog-te-banner-frame.skiptranslate { display: none !important; }
     body { top: 0px !important; }
 </style>
@@ -116,11 +117,11 @@ BASE_LAYOUT = """
             </div>
 
             <div class="flex flex-col md:flex-row items-center gap-4 w-full max-w-2xl">
-                <!-- Translator -->
+                <!-- Translation Widget -->
                 <div id="google_translate_element"></div>
                 
                 <form action="/" method="GET" class="flex bg-slate-100 dark:bg-slate-800 rounded-2xl px-5 py-2 w-full border border-slate-200 dark:border-slate-700">
-                    <input type="text" name="q" placeholder="Search apps, games..." class="bg-transparent border-none p-0 w-full text-sm font-semibold outline-none text-slate-800 dark:text-white" value="{{ q if q }}">
+                    <input type="text" name="q" placeholder="Search apps, games, tools..." class="bg-transparent border-none p-0 w-full text-sm font-semibold outline-none text-slate-800 dark:text-white" value="{{ q if q }}">
                     <button type="submit"><i class="fas fa-search text-indigo-600 text-lg"></i></button>
                 </form>
                 
@@ -134,6 +135,7 @@ BASE_LAYOUT = """
 
     <div class="{% if is_admin_route %}flex flex-col lg:flex-row min-h-screen{% else %}container mx-auto px-6 py-10{% endif %}">
         {% if is_admin_route %}
+        <!-- ADMIN SIDEBAR -->
         <div class="w-full lg:w-80 bg-slate-950 text-slate-400 p-8 flex flex-col lg:h-screen lg:sticky lg:top-0">
             <div class="flex items-center gap-4 mb-10 border-b border-slate-900 pb-8">
                 <img src="{{ site.logo }}" class="w-10 h-10 rounded-xl">
@@ -156,9 +158,10 @@ BASE_LAYOUT = """
                 <a href="/logout" class="text-red-500 font-black flex items-center gap-3"><i class="fas fa-power-off"></i> LOGOUT SYSTEM</a>
             </div>
         </div>
-        <div class="flex-1 p-6 lg:p-12 bg-white dark:bg-slate-900 transition">
+        <!-- ADMIN CONTENT AREA -->
+        <div class="flex-1 p-6 lg:p-12 bg-white dark:bg-slate-900 transition-colors duration-300">
             {% with messages = get_flashed_messages() %}{% if messages %}{% for m in messages %}
-            <div class="bg-indigo-600 text-white p-5 rounded-3xl mb-10 shadow-xl flex justify-between items-center">
+            <div class="bg-indigo-600 text-white p-5 rounded-3xl mb-10 shadow-xl flex justify-between items-center animate-bounce">
                 <span class="font-bold"><i class="fas fa-check-circle mr-2"></i> {{ m }}</span>
                 <button onclick="this.parentElement.remove()"><i class="fas fa-times"></i></button>
             </div>
@@ -166,6 +169,7 @@ BASE_LAYOUT = """
             {% block admin_content %}{% endblock %}
         </div>
         {% else %}
+        <!-- USER CONTENT AREA -->
         <div class="min-h-[80vh]">
             {% block content %}{% endblock %}
         </div>
@@ -178,18 +182,24 @@ BASE_LAYOUT = """
             <div>
                 <h3 class="text-white text-3xl font-black mb-6 uppercase italic tracking-tighter">{{ site.name }}</h3>
                 <p class="text-sm leading-relaxed mb-8">{{ site.desc }}</p>
+                <div class="flex gap-4">
+                    <a href="{{ site.fb }}" class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center hover:bg-indigo-600 transition hover:-translate-y-2"><i class="fab fa-facebook-f text-white text-xl"></i></a>
+                    <a href="{{ site.ig }}" class="w-12 h-12 bg-slate-900 rounded-2xl flex items-center justify-center hover:bg-indigo-600 transition hover:-translate-y-2"><i class="fab fa-instagram text-white text-xl"></i></a>
+                </div>
             </div>
             <div>
                 <h4 class="text-white font-bold mb-8 uppercase text-sm tracking-widest">Legal & Policy</h4>
                 <div class="flex flex-col gap-4 font-bold text-sm">
                     <a href="/p/privacy" class="hover:text-indigo-400 transition">Privacy Policy</a>
                     <a href="/p/terms" class="hover:text-indigo-400 transition">Terms of Service</a>
+                    <a href="/p/dmca" class="hover:text-indigo-400 transition">DMCA Notice</a>
                 </div>
             </div>
             <div>
-                <h4 class="text-white font-bold mb-8 uppercase text-sm tracking-widest">Language / Mode</h4>
+                <h4 class="text-white font-bold mb-8 uppercase text-sm tracking-widest">Multi-Lingual</h4>
                 <div class="bg-slate-900 p-6 rounded-3xl border border-slate-800">
-                    <span class="text-white font-black text-xs">Multi-Language & Dark Mode Enabled</span>
+                    <span class="text-[10px] block mb-1 uppercase font-black text-indigo-400">Night Mode Enabled</span>
+                    <span class="text-white font-black">All Servers Operational</span>
                 </div>
             </div>
         </div>
@@ -200,6 +210,8 @@ BASE_LAYOUT = """
     {% endif %}
 
     <script src="https://cdn.jsdelivr.net/npm/swiper@11/swiper-bundle.min.js"></script>
+    
+    <!-- Translation Init -->
     <script type="text/javascript">
         function googleTranslateElementInit() {
             new google.translate.TranslateElement({pageLanguage: 'en', includedLanguages: 'en,bn,hi'}, 'google_translate_element');
@@ -213,22 +225,24 @@ BASE_LAYOUT = """
             const icon = document.getElementById('themeIcon');
             const iconMobile = document.getElementById('themeIconMobile');
             body.classList.toggle('dark-mode');
+            
             const isDark = body.classList.contains('dark-mode');
             const iconClass = isDark ? 'fa-sun' : 'fa-moon';
-            icon.className = 'fas ' + iconClass;
-            iconMobile.className = 'fas ' + iconClass;
+            if(icon) icon.className = 'fas ' + iconClass;
+            if(iconMobile) iconMobile.className = 'fas ' + iconClass;
             localStorage.setItem('theme', isDark ? 'dark' : 'light');
         }
 
         document.addEventListener('DOMContentLoaded', function () {
+            // Theme Local Storage
             if(localStorage.getItem('theme') === 'dark') {
                 document.getElementById('pageBody').classList.add('dark-mode');
-                document.getElementById('themeIcon').className = 'fas fa-sun';
-                document.getElementById('themeIconMobile').className = 'fas fa-sun';
+                if(document.getElementById('themeIcon')) document.getElementById('themeIcon').className = 'fas fa-sun';
+                if(document.getElementById('themeIconMobile')) document.getElementById('themeIconMobile').className = 'fas fa-sun';
             }
+
             const swiper = new Swiper('.swiper', {
-                loop: true, 
-                autoplay: { delay: 4000, disableOnInteraction: false },
+                loop: true, autoplay: { delay: 4000, disableOnInteraction: false },
                 pagination: { el: '.swiper-pagination', clickable: true },
                 navigation: { nextEl: '.swiper-button-next', prevEl: '.swiper-button-prev' },
             });
@@ -244,6 +258,7 @@ BASE_LAYOUT = """
 def home():
     site = get_site_info()
     q = request.args.get('q', '')
+    
     all_media = list(media_col.find().sort('_id', -1))
     all_categories = list(categories_col.find().sort('name', 1))
     
@@ -266,7 +281,7 @@ def home():
             {% for m in all_media %}
             <div class="swiper-slide relative group">
                 <img src="{{ m.url }}" class="w-full h-full object-cover">
-                <div class="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent flex flex-col justify-end p-12">
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950 via-transparent to-transparent flex flex-col justify-end p-12 text-left">
                     <h2 class="text-white text-4xl md:text-6xl font-black uppercase italic tracking-tighter mb-4">{{ m.title }}</h2>
                     <a href="{{ m.link }}" target="_blank" class="bg-indigo-600 text-white px-10 py-4 rounded-2xl font-black inline-block w-fit shadow-2xl">EXPLORE NOW</a>
                 </div>
@@ -290,7 +305,8 @@ def home():
             <a href="/app/{{app._id}}" class="pro-card p-6 flex flex-col items-center text-center group">
                 {% if app.badge %}<div class="app-badge">{{ app.badge }}</div>{% endif %}
                 <div class="relative mb-6">
-                    <img src="{{app.logo}}" class="w-24 h-24 rounded-[2rem] shadow-2xl group-hover:rotate-6 transition duration-500 border-4 border-white dark:border-slate-700">
+                    <img src="{{app.logo}}" class="w-24 h-24 rounded-[2.5rem] shadow-2xl group-hover:rotate-6 transition duration-500 border-4 border-white dark:border-slate-700">
+                    <span class="absolute -top-3 -right-3 bg-indigo-600 text-white text-[9px] font-black px-3 py-1.5 rounded-full shadow-lg">PREMIUM</span>
                 </div>
                 <h3 class="font-black text-slate-800 dark:text-white text-base mb-4 line-clamp-1 uppercase italic">{{app.name}}</h3>
                 <div class="w-full bg-slate-950 dark:bg-indigo-600 text-white py-3.5 rounded-2xl text-[10px] font-black uppercase tracking-widest group-hover:bg-indigo-700 transition">DOWNLOAD</div>
@@ -312,7 +328,7 @@ def details(id):
         <img src="{{app.logo}}" class="w-64 h-64 rounded-[4rem] shadow-2xl border-[12px] border-slate-50 dark:border-slate-900">
         <div class="flex-1 text-center lg:text-left">
             <h1 class="text-5xl lg:text-7xl font-black mb-8 uppercase italic tracking-tighter text-slate-900 dark:text-white">{{app.name}}</h1>
-            <p class="text-slate-500 dark:text-slate-400 text-2xl mb-12 font-medium leading-relaxed">"{{app.info}}"</p>
+            <p class="text-slate-500 dark:text-slate-300 text-2xl mb-12 font-medium leading-relaxed">"{{app.info}}"</p>
             <div class="flex flex-wrap justify-center lg:justify-start gap-5 mb-12">
                 <div class="bg-indigo-600 text-white px-10 py-3 rounded-full font-black text-xs uppercase shadow-xl">{{app.category}}</div>
                 <div class="bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 px-10 py-3 rounded-full font-black text-xs uppercase italic">Ver: {{app.version}}</div>
@@ -416,7 +432,7 @@ def admin_categories():
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, cats=cats, is_admin_route=True, active="categories")
 
-# --- ADMIN: APPS MANAGER (WITH SEARCH & BADGE) ---
+# --- ADMIN: APPS MANAGER (SEARCH & BADGE INCLUDED) ---
 
 @app.route('/admin/apps', methods=['GET', 'POST'])
 def admin_apps():
@@ -424,7 +440,7 @@ def admin_apps():
     site = get_site_info()
     cats = list(categories_col.find().sort('name', 1))
     
-    # SEARCH LOGIC
+    # ADMIN SEARCH LOGIC
     admin_q = request.args.get('admin_q', '')
     query = {}
     if admin_q:
@@ -455,16 +471,18 @@ def admin_apps():
                 {% for c in cats %}<option value="{{c.name}}">{{c.name}}</option>{% endfor %}
             </select>
             <input name="version" placeholder="Version (e.g. 2.1.0)">
-            <textarea name="info" placeholder="Short Meta Description" class="h-32" required></textarea>
+            <textarea name="info" placeholder="Description" class="h-32" required></textarea>
             <input name="download_link" placeholder="Direct Download URL" required>
             <button class="btn-main w-full py-5 text-lg">PUBLISH APP</button>
         </form>
+        
         <div class="lg:col-span-8 space-y-6">
-            <!-- ADMIN SEARCH BAR -->
+            <!-- SEARCH BAR IN ADMIN -->
             <form action="/admin/apps" method="GET" class="flex bg-slate-100 rounded-3xl px-6 py-2 border border-slate-200 shadow-inner">
                 <input type="text" name="admin_q" placeholder="Search Apps by Name..." class="bg-transparent border-none p-0 w-full text-sm font-semibold outline-none" value="{{ admin_q }}">
                 <button type="submit"><i class="fas fa-search text-indigo-600 text-lg"></i></button>
             </form>
+
             <div class="bg-white border-2 rounded-[3rem] overflow-hidden shadow-xl overflow-x-auto">
                 <table class="w-full text-left">
                     <thead class="bg-slate-950 text-white text-[11px] uppercase font-bold tracking-widest">
@@ -480,7 +498,7 @@ def admin_apps():
                             <td class="p-6 uppercase font-black text-slate-400 text-[10px]">{{a.category}}</td>
                             <td class="p-6 text-right space-x-4">
                                 <a href="/admin/edit-app/{{a._id}}" class="text-indigo-600 font-bold">EDIT</a>
-                                <a href="/del/app/{{a._id}}" class="text-red-500 font-bold" onclick="return confirm('Delete this app?')">DEL</a>
+                                <a href="/del/app/{{a._id}}" class="text-red-500 font-bold" onclick="return confirm('Delete app?')">DEL</a>
                             </td>
                         </tr>
                         {% endfor %}
@@ -553,7 +571,7 @@ def admin_media():
             <h2 class="font-black text-emerald-600 uppercase italic">New Slider Banner</h2>
             <input name="title" placeholder="Banner Headline" required>
             <input name="url" placeholder="Banner Image URL" required>
-            <input name="link" placeholder="Redirect Link (Button Link)" required>
+            <input name="link" placeholder="Redirect Link" required>
             <button class="bg-emerald-600 text-white w-full py-5 rounded-2xl font-bold shadow-lg">PUBLISH BANNER</button>
         </form>
         <div class="lg:col-span-8 grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -563,9 +581,8 @@ def admin_media():
                     <img src="{{ m.url }}" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
                 </div>
                 <div class="p-6">
-                    <h3 class="font-black uppercase text-sm truncate mb-1 italic">{{ m.title }}</h3>
-                    <p class="text-[10px] text-slate-400 truncate mb-5 font-bold uppercase tracking-widest">{{ m.link }}</p>
-                    <a href="/admin/del-media/{{ m._id }}" class="text-red-500 font-black text-xs hover:underline" onclick="return confirm('Remove media?')">REMOVE FROM SLIDER</a>
+                    <h3 class="font-black uppercase text-sm truncate mb-1 italic text-slate-800">{{ m.title }}</h3>
+                    <a href="/admin/del-media/{{ m._id }}" class="text-red-500 font-black text-xs hover:underline" onclick="return confirm('Remove media?')">REMOVE SLIDE</a>
                 </div>
             </div>
             {% endfor %}
@@ -574,7 +591,7 @@ def admin_media():
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, media_list=media_list, is_admin_route=True, active="media")
 
-# --- ADMIN: ADS & LAYOUT ---
+# --- ADMIN: ADS ---
 
 @app.route('/admin/ads', methods=['GET', 'POST'])
 def admin_ads():
@@ -589,8 +606,8 @@ def admin_ads():
     <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">Ads Placement</h1>
     <div class="grid lg:grid-cols-2 gap-12">
         <form method="POST" class="bg-slate-50 p-10 rounded-[3rem] border-2 border-slate-200 space-y-5">
-            <input name="name" placeholder="Ad Spot Name (e.g. Header Banner)" required>
-            <textarea name="code" placeholder="Paste Ad HTML/JS Code Here" class="h-64 font-mono text-sm" required></textarea>
+            <input name="name" placeholder="Ad Unit Name" required>
+            <textarea name="code" placeholder="Ad HTML/JS Code" class="h-64 font-mono text-sm" required></textarea>
             <button class="btn-main w-full py-5">DEPLOY AD CODE</button>
         </form>
         <div class="space-y-6">
@@ -604,6 +621,8 @@ def admin_ads():
     </div>
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, ads_list=ads_list, is_admin_route=True, active="ads")
+
+# --- ADMIN: LAYOUT & BRANDING ---
 
 @app.route('/admin/layout', methods=['GET', 'POST'])
 def admin_layout():
@@ -619,77 +638,70 @@ def admin_layout():
             }}, upsert=True)
         elif l_type == 'legal':
             settings_col.update_one({"type": "legal_page", "page": request.form.get('page')}, {"$set": {"text": request.form.get('text')}}, upsert=True)
-        flash("Layout and branding settings saved.")
+        flash("Branding and layout settings saved.")
         return redirect('/admin/layout')
     
     content = """
-    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">Site Customization</h1>
+    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">Layout Settings</h1>
     <div class="grid lg:grid-cols-2 gap-12">
-        <!-- BRANDING -->
+        <!-- BRANDING FORM -->
         <form method="POST" class="bg-white p-10 rounded-[3rem] border-2 shadow-xl space-y-5 h-fit">
             <input type="hidden" name="l_type" value="branding">
-            <h2 class="font-black uppercase italic text-indigo-600 border-b pb-4">Branding & Socials</h2>
+            <h2 class="font-black text-indigo-600 uppercase border-b pb-4 italic">Branding</h2>
             <div class="grid grid-cols-2 gap-4">
-                <input name="name" value="{{site.name}}" placeholder="Site Name">
-                <input name="logo" value="{{site.logo}}" placeholder="Logo URL">
+                <input name="name" value="{{site.name}}">
+                <input name="logo" value="{{site.logo}}">
             </div>
-            <input name="title" value="{{site.title}}" placeholder="Browser Tab Title">
+            <input name="title" value="{{site.title}}">
             <textarea name="desc" class="h-24">{{site.desc}}</textarea>
-            <input name="copyright" value="{{site.copyright}}" placeholder="Copyright Text">
+            <input name="copyright" value="{{site.copyright}}">
             <div class="grid grid-cols-2 gap-4">
-                <input name="fb" value="{{site.fb}}" placeholder="Facebook Link">
-                <input name="ig" value="{{site.ig}}" placeholder="Instagram Link">
+                <input name="fb" value="{{site.fb}}" placeholder="Facebook">
+                <input name="ig" value="{{site.ig}}" placeholder="Instagram">
             </div>
-            <button class="btn-main w-full py-5">SAVE ALL BRANDING</button>
+            <button class="btn-main w-full py-5">SAVE BRANDING</button>
         </form>
-        <!-- LEGAL PAGES -->
-        <form method="POST" class="bg-slate-50 p-10 rounded-[3rem] border-2 border-dashed border-slate-200 space-y-5 h-fit">
+        <!-- LEGAL PAGES FORM -->
+        <form method="POST" class="bg-slate-50 p-10 rounded-[3rem] border-2 border-dashed space-y-5 h-fit">
             <input type="hidden" name="l_type" value="legal">
-            <h2 class="font-black uppercase italic text-emerald-600 border-b pb-4">Legal Page Editor</h2>
+            <h2 class="font-black text-emerald-600 uppercase border-b pb-4 italic">Legal Editor</h2>
             <select name="page" required>
                 <option value="privacy">Privacy Policy</option>
                 <option value="terms">Terms of Service</option>
                 <option value="dmca">DMCA Takedown</option>
             </select>
-            <textarea name="text" placeholder="Paste policy text here..." class="h-80 font-medium"></textarea>
-            <button class="btn-main w-full py-5 bg-emerald-600">UPDATE LEGAL CONTENT</button>
+            <textarea name="text" placeholder="Paste legal text here..." class="h-80 font-medium"></textarea>
+            <button class="btn-main w-full py-5 bg-emerald-600">UPDATE CONTENT</button>
         </form>
     </div>
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, is_admin_route=True, active="layout")
 
-# --- ADMIN: SETTINGS ---
+# --- ADMIN: SYSTEM SETTINGS ---
 
 @app.route('/admin/settings', methods=['GET', 'POST'])
 def admin_settings():
     if not session.get('logged_in'): return redirect('/admin-gate')
     if request.method == 'POST':
         settings_col.update_one({"type": "shortener"}, {"$set": {"url": request.form.get('url'), "api": request.form.get('api')}}, upsert=True)
-        flash("API Configuration Saved.")
+        flash("API Settings Updated.")
         return redirect('/admin/settings')
     
     cfg = get_shortener()
     site = get_site_info()
     content = """
-    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">System API Settings</h1>
+    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">System API</h1>
     <div class="bg-slate-950 p-16 rounded-[4rem] shadow-2xl border-4 border-slate-900">
-        <h2 class="text-emerald-400 font-black uppercase mb-8 italic tracking-widest text-sm">Universal Link Shortener (API)</h2>
         <form method="POST" class="space-y-8">
-            <div class="space-y-2">
-                <label class="text-white text-[10px] uppercase font-black ml-4 tracking-widest opacity-50">Shortener Domain</label>
-                <input name="url" value="{{cfg.url}}" placeholder="e.g. gplinks.in" class="bg-slate-900 border-none text-white font-bold py-6 text-xl">
-            </div>
-            <div class="space-y-2">
-                <label class="text-white text-[10px] uppercase font-black ml-4 tracking-widest opacity-50">Secret API Token</label>
-                <input name="api" value="{{cfg.api}}" placeholder="Paste API Key Here" class="bg-slate-900 border-none text-white font-bold py-6 text-xl">
-            </div>
-            <button class="bg-emerald-500 text-black w-full py-6 rounded-[2rem] font-black text-2xl hover:bg-white transition duration-500">UPDATE GLOBAL API</button>
+            <input name="url" value="{{cfg.url}}" placeholder="Shortener Domain (e.g. gplinks.in)" class="bg-slate-900 border-none text-white font-bold py-6 text-xl">
+            <input name="api" value="{{cfg.api}}" placeholder="API Secret Key" class="bg-slate-900 border-none text-white font-bold py-6 text-xl">
+            <button class="bg-emerald-500 text-black w-full py-6 rounded-[2rem] font-black text-2xl hover:bg-white transition duration-500">UPDATE GLOBAL CONFIG</button>
         </form>
     </div>
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, cfg=cfg, is_admin_route=True, active="settings")
 
-# --- AUTH SYSTEM (LOGIN/FORGOT) ---
+# --- LOGIN & AUTH ---
 
 @app.route('/admin-gate', methods=['GET', 'POST'])
 def login():
@@ -702,16 +714,16 @@ def login():
             session['logged_in'] = True; return redirect('/admin/dashboard')
         if check_password_hash(admin['password'], pw):
             session['logged_in'] = True; return redirect('/admin/dashboard')
-        flash("Invalid Credentials.")
+        flash("Invalid Authorization Key.")
     return render_template_string(f"""
     <!DOCTYPE html><html><head>{BASE_CSS}</head>
     <body class="bg-slate-100 flex items-center justify-center min-h-screen p-6">
         <form method="POST" class="bg-white p-12 rounded-[4rem] shadow-2xl w-full max-w-md text-center border-4 border-white">
             <img src="{site['logo']}" class="w-24 h-24 rounded-[2rem] mx-auto mb-10 shadow-xl border-4 border-slate-50">
-            <h2 class="text-4xl font-black mb-10 uppercase italic tracking-tighter">System Access</h2>
+            <h2 class="text-4xl font-black mb-10 uppercase italic tracking-tighter">System Lock</h2>
             <input type="password" name="password" class="text-center font-black text-3xl mb-8 p-6" placeholder="••••••••" required>
-            <button class="bg-slate-950 text-white w-full py-6 rounded-3xl font-black text-xl shadow-2xl hover:bg-indigo-600 transition duration-500">UNLOCK PANEL</button>
-            <a href="/forgot" class="block mt-8 text-xs font-bold text-slate-400 uppercase tracking-widest">Forgot Password?</a>
+            <button class="bg-slate-950 text-white w-full py-6 rounded-3xl font-black text-xl shadow-2xl hover:bg-indigo-600 transition">UNLOCK SYSTEM</button>
+            <a href="/forgot" class="block mt-8 text-xs font-bold text-slate-400 uppercase">Forgot Password?</a>
         </form>
     </body></html>
     """)
@@ -723,9 +735,9 @@ def forgot():
             users_col.update_one({"username": "admin"}, {"$set": {"password": generate_password_hash(request.form.get('pw'))}}, upsert=True)
             flash("System password has been reset.")
             return redirect('/admin-gate')
-    return render_template_string(f"<!DOCTYPE html><html><head>{BASE_CSS}</head><body class='bg-slate-100 flex items-center justify-center min-h-screen'><form method='POST' class='bg-white p-12 rounded-[3.5rem] shadow-xl w-full max-w-md space-y-6'><h2 class='font-black uppercase italic text-center'>Emergency Reset</h2><input name='key' placeholder='Recovery Key' required><input type='password' name='pw' placeholder='New Password' required><button class='btn-main w-full py-5 text-xl'>RESET NOW</button></form></body></html>")
+    return render_template_string(f"<!DOCTYPE html><html><head>{BASE_CSS}</head><body class='bg-slate-100 flex items-center justify-center min-h-screen'><form method='POST' class='bg-white p-12 rounded-[3.5rem] shadow-xl w-full max-w-md space-y-6'><h2 class='font-black uppercase italic text-center'>Emergency Recovery</h2><input name='key' placeholder='Recovery Key' required><input type='password' name='pw' placeholder='New Password' required><button class='btn-main w-full py-5 text-xl'>RESET NOW</button></form></body></html>")
 
-# --- SYSTEM CORE ---
+# --- CORE LOGIC: DOWNLOADS & DELETE ---
 
 @app.route('/get/<id>')
 def download_process(id):
@@ -753,7 +765,7 @@ def delete_cat(id):
 def delete_media(id):
     if not session.get('logged_in'): return redirect('/admin-gate')
     media_col.delete_one({"_id": ObjectId(id)})
-    flash("Media banner removed.")
+    flash("Slider item removed.")
     return redirect('/admin/media')
 
 @app.route('/del/<type>/<id>')
@@ -767,7 +779,7 @@ def delete_entry(type, id):
 @app.route('/logout')
 def logout(): session.clear(); return redirect('/')
 
-# --- RUN APPLICATION ---
+# --- START SERVER ---
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port)
