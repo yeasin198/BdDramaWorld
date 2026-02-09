@@ -25,7 +25,8 @@ try:
     ads_col = db['ads']
     settings_col = db['settings']
     categories_col = db['categories']
-    badges_col = db['badges'] # New Collection for Poster Badges
+    badges_col = db['badges'] 
+    versions_col = db['versions'] # New Collection for App Versions
     media_col = db['media']
     
 except Exception as e:
@@ -112,8 +113,12 @@ BASE_LAYOUT = """
     <meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ site.name }} - {{ site.title }}</title>
     """ + BASE_CSS + """
-    {# Global Header Ads Script (Like AdSense Auto Ads) #}
+    
+    {# Global Ads: Popunder / Social Bar (Head) #}
     {{ ads['GlobalHeader'] | safe if ads and 'GlobalHeader' in ads }}
+    {{ ads['Popunder'] | safe if ads and 'Popunder' in ads }}
+    {{ ads['SocialBar'] | safe if ads and 'SocialBar' in ads }}
+
 </head>
 <body id="pageBody">
     {% if not is_admin_route %}
@@ -142,7 +147,7 @@ BASE_LAYOUT = """
         </div>
     </nav>
     
-    {# Top Banner Ad Slot #}
+    {# Banner 728x90 or 320x50 (Top) #}
     <div class="ad-slot-wrapper">
         {{ ads['TopBanner_728x90'] | safe if ads and 'TopBanner_728x90' in ads }}
     </div>
@@ -162,6 +167,7 @@ BASE_LAYOUT = """
                 <a href="/admin/dashboard" class="sidebar-link {% if active == 'dashboard' %}sidebar-active{% endif %}"><i class="fas fa-chart-line"></i> Dashboard</a>
                 <a href="/admin/categories" class="sidebar-link {% if active == 'categories' %}sidebar-active{% endif %}"><i class="fas fa-tags"></i> Categories</a>
                 <a href="/admin/badges" class="sidebar-link {% if active == 'badges' %}sidebar-active{% endif %}"><i class="fas fa-certificate"></i> Poster Badges</a>
+                <a href="/admin/versions" class="sidebar-link {% if active == 'versions' %}sidebar-active{% endif %}"><i class="fas fa-code-branch"></i> App Versions</a>
                 <a href="/admin/apps" class="sidebar-link {% if active == 'apps' %}sidebar-active{% endif %}"><i class="fas fa-rocket"></i> Apps Manager</a>
                 <a href="/admin/media" class="sidebar-link {% if active == 'media' %}sidebar-active{% endif %}"><i class="fas fa-photo-video"></i> Media Center</a>
                 <a href="/admin/ads" class="sidebar-link {% if active == 'ads' %}sidebar-active{% endif %}"><i class="fas fa-ad"></i> Ads Manager</a>
@@ -503,7 +509,49 @@ def admin_badges():
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, badges=badges, is_admin_route=True, ads={}, active="badges")
 
-# --- ADMIN: APPS MANAGER (SEARCH & BADGE SELECTION INCLUDED) ---
+# --- ADMIN: APP VERSIONS (NEW) ---
+
+@app.route('/admin/versions', methods=['GET', 'POST'])
+def admin_versions():
+    if not session.get('logged_in'): return redirect('/admin-gate')
+    if request.method == 'POST':
+        name = request.form.get('name')
+        versions_col.update_one({"name": name}, {"$set": {"name": name}}, upsert=True)
+        flash("Version tag saved successfully.")
+        return redirect('/admin/versions')
+    
+    vers = list(versions_col.find().sort('name', -1))
+    site = get_site_info()
+    content = """
+    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">Version Manager</h1>
+    <div class="grid lg:grid-cols-12 gap-12">
+        <form method="POST" class="lg:col-span-4 bg-slate-50 p-10 rounded-[3rem] border-2 border-dashed border-slate-200 h-fit space-y-5">
+            <h2 class="font-black text-emerald-600 uppercase italic">Add Version Tag</h2>
+            <input name="name" placeholder="Version (e.g. v1.0.2, Lastest)" required>
+            <button class="btn-main w-full py-5 text-lg bg-emerald-600">SAVE VERSION</button>
+        </form>
+        <div class="lg:col-span-8 bg-white border-2 rounded-[3rem] overflow-hidden shadow-xl">
+            <table class="w-full text-left">
+                <thead class="bg-slate-950 text-white text-[11px] uppercase font-bold tracking-widest">
+                    <tr><th class="p-6">Version Name</th><th class="p-6 text-right">Actions</th></tr>
+                </thead>
+                <tbody class="text-sm font-bold">
+                    {% for v in vers %}
+                    <tr class="border-t hover:bg-slate-50 transition">
+                        <td class="p-6 text-slate-800 font-black">{{ v.name }}</td>
+                        <td class="p-6 text-right">
+                            <a href="/admin/del-version/{{ v._id }}" class="text-red-500 hover:underline" onclick="return confirm('Delete version?')">DELETE</a>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    """
+    return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, vers=vers, is_admin_route=True, ads={}, active="versions")
+
+# --- ADMIN: APPS MANAGER ---
 
 @app.route('/admin/apps', methods=['GET', 'POST'])
 def admin_apps():
@@ -511,6 +559,7 @@ def admin_apps():
     site = get_site_info()
     cats = list(categories_col.find().sort('name', 1))
     all_badges = list(badges_col.find().sort('name', 1))
+    all_vers = list(versions_col.find().sort('name', -1))
     
     admin_q = request.args.get('admin_q', '')
     query = {}
@@ -537,16 +586,17 @@ def admin_apps():
             <input name="name" placeholder="Application Title" required>
             <input name="logo" placeholder="Logo Link" required>
             <select name="badge">
-                <option value="">Select Poster Badge (Optional)</option>
-                {% for b in all_badges %}
-                <option value="{{ b.name }}">{{ b.name }}</option>
-                {% endfor %}
+                <option value="">Select Poster Badge</option>
+                {% for b in all_badges %}<option value="{{ b.name }}">{{ b.name }}</option>{% endfor %}
             </select>
             <select name="category" required>
                 <option value="" disabled selected>Select Category</option>
                 {% for c in cats %}<option value="{{c.name}}">{{c.name}}</option>{% endfor %}
             </select>
-            <input name="version" placeholder="Version">
+            <select name="version" required>
+                <option value="" disabled selected>Select Version</option>
+                {% for v in all_vers %}<option value="{{v.name}}">{{v.name}}</option>{% endfor %}
+            </select>
             <textarea name="info" placeholder="Description" class="h-32" required></textarea>
             <input name="download_link" placeholder="Download URL" required>
             <button class="btn-main w-full py-5 text-lg">PUBLISH APP</button>
@@ -582,7 +632,7 @@ def admin_apps():
         </div>
     </div>
     """
-    return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, all_apps=all_apps, cats=cats, all_badges=all_badges, admin_q=admin_q, is_admin_route=True, ads={}, active="apps")
+    return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, all_apps=all_apps, cats=cats, all_badges=all_badges, all_vers=all_vers, admin_q=admin_q, is_admin_route=True, ads={}, active="apps")
 
 @app.route('/admin/edit-app/<id>', methods=['GET', 'POST'])
 def edit_app(id):
@@ -591,6 +641,7 @@ def edit_app(id):
     site = get_site_info()
     cats = list(categories_col.find().sort('name', 1))
     all_badges = list(badges_col.find().sort('name', 1))
+    all_vers = list(versions_col.find().sort('name', -1))
     
     if request.method == 'POST':
         apps_col.update_one({"_id": ObjectId(id)}, {"$set": {
@@ -609,15 +660,15 @@ def edit_app(id):
             <input name="name" value="{{app_data.name}}" required>
             <input name="logo" value="{{app_data.logo}}" required>
             <select name="badge">
-                <option value="">Select Poster Badge (Optional)</option>
-                {% for b in all_badges %}
-                <option value="{{ b.name }}" {% if b.name == app_data.badge %}selected{% endif %}>{{ b.name }}</option>
-                {% endfor %}
+                <option value="">Select Poster Badge</option>
+                {% for b in all_badges %}<option value="{{ b.name }}" {% if b.name == app_data.badge %}selected{% endif %}>{{ b.name }}</option>{% endfor %}
             </select>
             <select name="category" required>
                 {% for c in cats %}<option value="{{c.name}}" {% if c.name == app_data.category %}selected{% endif %}>{{c.name}}</option>{% endfor %}
             </select>
-            <input name="version" value="{{app_data.version}}">
+            <select name="version" required>
+                {% for v in all_vers %}<option value="{{v.name}}" {% if v.name == app_data.version %}selected{% endif %}>{{v.name}}</option>{% endfor %}
+            </select>
         </div>
         <textarea name="info" class="h-40" required>{{app_data.info}}</textarea>
         <input name="download_link" value="{{app_data.download_link}}" required>
@@ -627,7 +678,7 @@ def edit_app(id):
         </div>
     </form>
     """
-    return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, app_data=app_data, cats=cats, all_badges=all_badges, is_admin_route=True, ads={}, active="apps")
+    return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, app_data=app_data, cats=cats, all_badges=all_badges, all_vers=all_vers, is_admin_route=True, ads={}, active="apps")
 
 # --- ADMIN: MEDIA ---
 
@@ -701,11 +752,10 @@ def admin_ads():
                 <option value="Popunder">Popunder Script</option>
                 <option value="SocialBar">Social Bar / Floater</option>
             </select>
-            <textarea name="code" placeholder="Paste Ad HTML/JS Code Here (Google Adsense, Propeller, etc.)" class="h-64 font-mono text-sm" required></textarea>
+            <textarea name="code" placeholder="Paste Ad HTML/JS Code Here" class="h-64 font-mono text-sm" required></textarea>
             <button class="btn-main w-full py-5">DEPLOY AD CODE</button>
         </form>
         <div class="space-y-6">
-            <h2 class="font-black text-slate-700 uppercase italic">Active Ad Placements</h2>
             {% for ad in ads_list %}
             <div class="bg-white border-2 p-8 rounded-[2.5rem] flex justify-between items-center shadow-lg">
                 <span class="font-black uppercase text-sm italic tracking-widest text-slate-700">{{ ad.name }}</span>
@@ -774,21 +824,44 @@ def admin_layout():
 def admin_settings():
     if not session.get('logged_in'): return redirect('/admin-gate')
     if request.method == 'POST':
-        settings_col.update_one({"type": "shortener"}, {"$set": {"url": request.form.get('url'), "api": request.form.get('api')}}, upsert=True)
-        flash("API Configuration Saved.")
+        form_type = request.form.get('form_type')
+        if form_type == 'api':
+            settings_col.update_one({"type": "shortener"}, {"$set": {"url": request.form.get('url'), "api": request.form.get('api')}}, upsert=True)
+            flash("API Configuration Saved.")
+        elif form_type == 'password':
+            new_pw = request.form.get('new_password')
+            confirm_pw = request.form.get('confirm_password')
+            if new_pw == confirm_pw:
+                users_col.update_one({"username": "admin"}, {"$set": {"password": generate_password_hash(new_pw)}})
+                flash("Admin password updated successfully.")
+            else:
+                flash("Passwords do not match!")
         return redirect('/admin/settings')
     
     cfg = get_shortener()
     site = get_site_info()
     content = """
-    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">System API Settings</h1>
-    <div class="bg-slate-950 p-16 rounded-[4rem] shadow-2xl border-4 border-slate-900">
-        <h2 class="text-emerald-400 font-black uppercase mb-8 italic tracking-widest text-sm">Universal Link Shortener (API)</h2>
-        <form method="POST" class="space-y-8">
-            <input name="url" value="{{cfg.url}}" placeholder="Domain" class="bg-slate-900 border-none text-white font-bold py-6 text-xl">
-            <input name="api" value="{{cfg.api}}" placeholder="API Token" class="bg-slate-900 border-none text-white font-bold py-6 text-xl">
-            <button class="bg-emerald-500 text-black w-full py-6 rounded-[2rem] font-black text-2xl">UPDATE GLOBAL API</button>
-        </form>
+    <h1 class="text-5xl font-black mb-12 uppercase italic tracking-tighter">System & Security</h1>
+    <div class="grid lg:grid-cols-2 gap-12">
+        <div class="bg-slate-950 p-12 rounded-[4rem] shadow-2xl border-4 border-slate-900">
+            <h2 class="text-emerald-400 font-black uppercase mb-8 italic tracking-widest text-sm">Universal Link Shortener (API)</h2>
+            <form method="POST" class="space-y-6">
+                <input type="hidden" name="form_type" value="api">
+                <input name="url" value="{{cfg.url}}" placeholder="Domain" class="bg-slate-900 border-none text-white font-bold py-5 text-xl">
+                <input name="api" value="{{cfg.api}}" placeholder="API Token" class="bg-slate-900 border-none text-white font-bold py-5 text-xl">
+                <button class="bg-emerald-500 text-black w-full py-5 rounded-[2rem] font-black text-xl">UPDATE GLOBAL API</button>
+            </form>
+        </div>
+        
+        <div class="bg-white p-12 rounded-[4rem] shadow-2xl border-4 border-slate-50">
+            <h2 class="text-indigo-600 font-black uppercase mb-8 italic tracking-widest text-sm">Change Admin Password</h2>
+            <form method="POST" class="space-y-6">
+                <input type="hidden" name="form_type" value="password">
+                <input type="password" name="new_password" placeholder="New Password" required class="bg-slate-50 border-slate-200">
+                <input type="password" name="confirm_password" placeholder="Confirm New Password" required class="bg-slate-50 border-slate-200">
+                <button class="btn-main w-full py-5 text-xl">UPDATE PASSWORD</button>
+            </form>
+        </div>
     </div>
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, cfg=cfg, is_admin_route=True, ads={}, active="settings")
@@ -844,6 +917,11 @@ def delete_cat(id):
 def delete_badge(id):
     if not session.get('logged_in'): return redirect('/admin-gate')
     badges_col.delete_one({"_id": ObjectId(id)}); return redirect('/admin/badges')
+
+@app.route('/admin/del-version/<id>')
+def delete_version(id):
+    if not session.get('logged_in'): return redirect('/admin-gate')
+    versions_col.delete_one({"_id": ObjectId(id)}); return redirect('/admin/versions')
 
 @app.route('/admin/del-media/<id>')
 def delete_media(id):
