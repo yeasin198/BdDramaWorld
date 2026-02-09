@@ -1,5 +1,6 @@
 import os
 import requests
+import certifi
 from datetime import datetime
 from flask import Flask, render_template_string, request, redirect, url_for, session, flash
 from pymongo import MongoClient
@@ -9,32 +10,23 @@ from werkzeug.security import generate_password_hash, check_password_hash
 app = Flask(__name__)
 
 # --- CONFIGURATION & SECURITY ---
-# এই সিক্রেট কি গুলো ভার্সেল এনভায়রনমেন্টে সেট করবেন
 app.secret_key = os.environ.get("SESSION_SECRET", "super_high_secure_long_secret_key_v100_final_2024")
 RECOVERY_KEY = os.environ.get("RECOVERY_KEY", "admin@2024")
 
-import certifi
-
-# --- MONGODB CONNECTION ---
+# --- MONGODB CONNECTION (Fixed for Cloud Deployment) ---
 try:
-    # ca_file যুক্ত করা হয়েছে SSL ত্রুটি এড়াতে
     ca = certifi.where()
+    # আপনার দেওয়া MongoDB কানেকশন লিঙ্ক
     MONGO_URI = "mongodb+srv://Demo270:Demo270@cluster0.ls1igsg.mongodb.net/?retryWrites=true&w=majority&appName=Cluster0"
-    
-    # client টি গ্লোবাল রাখা হয়েছে কিন্তু কানেকশন চেক করার জন্য tlsCAFile ব্যবহার করা হয়েছে
     client = MongoClient(MONGO_URI, tlsCAFile=ca, serverSelectionTimeoutMS=5000)
     db = client['app_hub_production_ultimate_system']
-    
     apps_col = db['apps']
     users_col = db['users']
     ads_col = db['ads']
     settings_col = db['settings']
-    
-    # কানেকশন চেক করা (এটি অপশনাল কিন্তু ইরর বুঝতে সাহায্য করবে)
-    client.admin.command('ping')
-    print("MongoDB Connected Successfully!")
 except Exception as e:
     print(f"DATABASE CONNECTION ERROR: {e}")
+
 # --- DYNAMIC SITE HELPERS ---
 def get_site_info():
     info = settings_col.find_one({"type": "site_info"})
@@ -45,9 +37,8 @@ def get_site_info():
 def get_shortener():
     return settings_col.find_one({"type": "shortener"}) or {"url": "", "api": ""}
 
-# --- HTML TEMPLATES (EXTENSIVE & DETAILED DESIGN) ---
+# --- HTML TEMPLATES ---
 
-# ডিজাইন এরর এড়াতে টেমপ্লেটগুলো f-string ছাড়াই রাখা হয়েছে
 BASE_CSS = """
 <script src="https://cdn.tailwindcss.com"></script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.2/css/all.min.css">
@@ -103,7 +94,6 @@ BASE_LAYOUT = """
 
     <div class="{% if is_admin_route %}flex min-h-screen{% else %}container mx-auto px-6 py-12{% endif %}">
         {% if is_admin_route %}
-        <!-- ADMIN SIDEBAR -->
         <div class="w-80 bg-slate-950 text-slate-400 p-8 flex flex-col sticky top-0 h-screen shadow-2xl">
             <div class="flex items-center gap-3 mb-12 border-b border-slate-900 pb-6">
                 <img src="{{ site.logo }}" class="w-10 h-10 rounded-xl shadow-lg">
@@ -134,7 +124,6 @@ BASE_LAYOUT = """
             {% block admin_content %}{% endblock %}
         </div>
         {% else %}
-        <!-- USER CONTENT -->
         <div class="w-full min-h-[70vh]">
             {% with messages = get_flashed_messages() %}
                 {% if messages %}
@@ -214,7 +203,6 @@ def home():
     ads = list(ads_col.find())
     
     content = """
-    <!-- HERO SLIDER SECTION -->
     {% if featured %}
     <div class="swiper mb-16 shadow-2xl">
         <div class="swiper-wrapper">
@@ -241,7 +229,6 @@ def home():
     </div>
     {% endif %}
 
-    <!-- ADS PLACEMENTS -->
     <div class="max-w-4xl mx-auto mb-16 space-y-8">
         {% for ad in ads %}
         <div class="bg-white p-6 rounded-[2.5rem] border-2 border-slate-100 shadow-sm flex justify-center items-center overflow-hidden min-h-[100px]">
@@ -250,7 +237,6 @@ def home():
         {% endfor %}
     </div>
 
-    <!-- SEARCH & GRID SECTION -->
     <div class="flex flex-col md:flex-row items-center justify-between mb-12 gap-6">
         <div>
             <h2 class="text-4xl font-black text-slate-900 tracking-tighter uppercase italic">
@@ -363,7 +349,6 @@ def download_process(id):
     
     if cfg.get('url') and cfg.get('api'):
         try:
-            # External Shortener API Call
             api_endpoint = f"https://{cfg['url']}/api?api={cfg['api']}&url={target}"
             res = requests.get(api_endpoint, timeout=12).json()
             short_url = res.get('shortenedUrl') or res.get('shortedUrl')
@@ -372,8 +357,6 @@ def download_process(id):
             print(f"SHORTENER ERROR: {e}")
             
     return redirect(target)
-
-# --- ADMIN AUTHENTICATION (SECURE & HIDDEN) ---
 
 @app.route('/admin-gate', methods=['GET', 'POST'])
 def login():
@@ -404,8 +387,6 @@ def login():
     </div>
     """
     return render_template_string(f"<!DOCTYPE html><html lang='en'><head>{BASE_CSS}</head><body class='bg-slate-100'>{content}</body></html>")
-
-# --- ADMIN PANEL FUNCTIONALITY ---
 
 @app.route('/admin/dashboard')
 def admin_dashboard():
@@ -449,14 +430,6 @@ def admin_dashboard():
             </div>
         </div>
     </div>
-    
-    <div class="bg-slate-50 p-16 rounded-[5rem] border-4 border-dashed border-slate-200 flex items-center justify-between shadow-inner">
-        <div class="max-w-2xl">
-            <h2 class="text-4xl font-black text-slate-900 mb-6 tracking-tighter uppercase">Platform Master Console</h2>
-            <p class="text-slate-500 text-xl font-medium leading-relaxed italic">"Administrator, your platform is operating at 100% capacity. Your database is healthy and all external APIs are responding within optimal latency. Manage your assets using the high-performance navigation menu."</p>
-        </div>
-        <img src="https://cdn-icons-png.flaticon.com/512/3649/3649460.png" class="w-64 hidden lg:block opacity-20 filter grayscale">
-    </div>
     """
     return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, stats=stats, is_admin_route=True, active="dashboard")
 
@@ -489,7 +462,6 @@ def admin_apps():
     </div>
 
     <div class="grid xl:grid-cols-12 gap-16">
-        <!-- ADVANCED FORM -->
         <div class="xl:col-span-4 bg-white p-12 rounded-[4rem] shadow-2xl border-2 border-slate-50 h-fit sticky top-28">
             <h2 class="text-3xl font-black mb-10 text-indigo-700 italic border-b pb-6 uppercase tracking-tighter">Publish Content</h2>
             <form method="POST" class="space-y-6">
@@ -532,7 +504,6 @@ def admin_apps():
                 <button class="btn-main w-full justify-center py-6 rounded-[2.5rem] uppercase font-black text-xl tracking-widest italic mt-4 shadow-indigo-200 shadow-2xl">PUBLISH ASSET</button>
             </form>
         </div>
-        <!-- DATA TABLE -->
         <div class="xl:col-span-8 bg-white rounded-[4rem] border-4 border-slate-50 overflow-hidden shadow-2xl">
             <table class="w-full text-left">
                 <thead class="bg-slate-900 text-white">
@@ -542,31 +513,19 @@ def admin_apps():
                     {% for a in apps %}
                     <tr class="border-b border-slate-50 hover:bg-indigo-50/30 transition duration-500 group">
                         <td class="p-8 flex items-center gap-8">
-                            <div class="relative flex-shrink-0">
-                                <img src="{{a.logo}}" class="w-20 h-20 rounded-[2.5rem] shadow-2xl group-hover:scale-110 transition duration-700 object-cover border-4 border-white">
-                                {% if a.featured %}<div class="absolute -top-3 -right-3 bg-orange-500 text-white text-[8px] font-black px-3 py-1 rounded-full shadow-xl animate-pulse">SLIDER</div>{% endif %}
-                            </div>
+                            <img src="{{a.logo}}" class="w-20 h-20 rounded-[2.5rem] shadow-2xl object-cover border-4 border-white">
                             <div>
                                 <p class="font-black text-slate-950 text-2xl tracking-tighter mb-1 uppercase italic leading-none group-hover:text-indigo-600 transition">{{a.name}}</p>
-                                <div class="flex items-center gap-3">
-                                    <span class="text-[9px] font-black bg-indigo-600 text-white px-2.5 py-0.5 rounded-full uppercase tracking-widest">{{a.category}}</span>
-                                    <span class="text-[10px] font-extrabold text-slate-400 uppercase tracking-widest">v{{a.version}}</span>
-                                </div>
+                                <span class="text-[9px] font-black bg-indigo-600 text-white px-2.5 py-0.5 rounded-full uppercase">{{a.category}}</span>
                             </div>
                         </td>
                         <td class="p-8 text-right">
-                            <a href="/del/app/{{a._id}}" class="text-red-500 font-black text-xs bg-red-50 px-10 py-4 rounded-[2rem] hover:bg-red-500 hover:text-white transition duration-500 shadow-xl shadow-red-100" onclick="return confirm('CRITICAL WARNING: This asset will be permanently purged from the database. Proceed?')">REMOVE ASSET</a>
+                            <a href="/del/app/{{a._id}}" class="text-red-500 font-black text-xs bg-red-50 px-10 py-4 rounded-[2rem] hover:bg-red-500 hover:text-white transition" onclick="return confirm('Delete this asset?')">REMOVE ASSET</a>
                         </td>
                     </tr>
                     {% endfor %}
                 </tbody>
             </table>
-            {% if not apps %}
-            <div class="p-40 text-center flex flex-col items-center">
-                <i class="fas fa-folder-open text-9xl text-slate-100 mb-8"></i>
-                <h3 class="text-3xl font-black text-slate-200 uppercase tracking-widest">No Database Entries</h3>
-            </div>
-            {% endif %}
         </div>
     </div>
     """
@@ -578,49 +537,31 @@ def admin_ads():
     site = get_site_info()
     if request.method == 'POST':
         ads_col.insert_one({"name": request.form.get('name'), "code": request.form.get('code'), "created_at": datetime.now()})
-        flash("Monetization Module: Ad unit snippet successfully integrated into server.")
+        flash("Ad unit integrated successfully.")
         return redirect('/admin/ads')
     
     ads_list = list(ads_col.find())
     content = """
-    <h1 class="text-6xl font-black mb-16 tracking-tighter italic uppercase underline decoration-emerald-200 decoration-8 underline-offset-8">Monetization Hub</h1>
+    <h1 class="text-6xl font-black mb-16 tracking-tighter italic uppercase">Monetization Hub</h1>
     <div class="grid lg:grid-cols-12 gap-16">
         <div class="lg:col-span-5 bg-white p-12 rounded-[4rem] border-2 border-slate-50 shadow-2xl h-fit">
-            <h2 class="text-3xl font-black mb-10 text-emerald-600 italic border-b pb-6 uppercase tracking-tighter">Inject New Script</h2>
             <form method="POST" class="space-y-6">
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 block">Ad Unit Identity</label>
-                    <input name="name" placeholder="Header / Interstitial / Sidebar" class="w-full font-bold" required>
-                </div>
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-2 mb-2 block">JavaScript/HTML Code Snippet</label>
-                    <textarea name="code" placeholder="Paste full script code here..." class="w-full h-80 font-mono text-xs focus:ring-4 ring-emerald-500/10 border-emerald-100 leading-relaxed" required></textarea>
-                </div>
-                <button class="btn-main w-full justify-center py-6 bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 uppercase font-black tracking-widest italic text-lg">DEPLOY AD UNIT</button>
+                <input name="name" placeholder="Ad Unit Name" class="w-full" required>
+                <textarea name="code" placeholder="Paste script code here..." class="w-full h-80" required></textarea>
+                <button class="btn-main w-full justify-center">DEPLOY AD UNIT</button>
             </form>
         </div>
         <div class="lg:col-span-7 space-y-8">
-            <h2 class="text-3xl font-black text-slate-900 mb-10 tracking-tighter uppercase italic">Active Units ({{ ads|length }})</h2>
             {% for ad in ads %}
-            <div class="flex justify-between items-center p-10 bg-white border-2 border-slate-50 rounded-[3rem] shadow-sm hover:shadow-2xl transition duration-500 group">
-                <div class="flex items-center gap-8">
-                    <div class="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-[2rem] flex items-center justify-center text-2xl shadow-inner group-hover:bg-emerald-600 group-hover:text-white transition duration-500">
-                        <i class="fas fa-ad"></i>
-                    </div>
-                    <div>
-                        <p class="font-black text-slate-950 text-3xl tracking-tighter mb-1 uppercase">{{ ad.name }}</p>
-                        <p class="text-xs font-black text-emerald-500 uppercase tracking-[0.2em] italic flex items-center gap-2">
-                            <span class="w-2 h-2 bg-emerald-500 rounded-full animate-ping"></span> STATUS: LIVE & BROADCASTING
-                        </p>
-                    </div>
-                </div>
-                <a href="/del/ad/{{ad._id}}" class="text-red-500 font-black text-xs bg-red-50 px-10 py-4 rounded-full hover:bg-red-500 hover:text-white transition shadow-xl shadow-red-100">DISABLE UNIT</a>
+            <div class="flex justify-between items-center p-10 bg-white border-2 border-slate-50 rounded-[3rem] shadow-sm">
+                <p class="font-black text-slate-950 text-3xl">{{ ad.name }}</p>
+                <a href="/del/ad/{{ad._id}}" class="text-red-500 font-black">DISABLE UNIT</a>
             </div>
             {% endfor %}
         </div>
     </div>
     """
-    return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, ads=ads, is_admin_route=True, active="ads")
+    return render_template_string(BASE_LAYOUT.replace('{% block admin_content %}{% endblock %}', content), site=site, ads=ads_list, is_admin_route=True, active="ads")
 
 @app.route('/admin/settings', methods=['GET', 'POST'])
 def admin_settings():
@@ -630,55 +571,30 @@ def admin_settings():
         f_type = request.form.get('type')
         if f_type == "branding":
             settings_col.update_one({"type": "site_info"}, {"$set": {"name": request.form.get('name'), "title": request.form.get('title'), "logo": request.form.get('logo')}}, upsert=True)
-            flash("System Lab: Site branding and UI assets have been re-synchronized across the server.")
         elif f_type == "shortener":
             settings_col.update_one({"type": "shortener"}, {"$set": {"url": request.form.get('url'), "api": request.form.get('api')}}, upsert=True)
-            flash("Backend Update: External API Gateway and Redirection protocols updated.")
+        flash("Settings updated.")
         return redirect('/admin/settings')
 
     cfg = get_shortener()
     content = """
-    <h1 class="text-6xl font-black mb-20 tracking-tighter italic uppercase underline decoration-indigo-200 decoration-8 underline-offset-8">Global Configuration</h1>
+    <h1 class="text-6xl font-black mb-20 tracking-tighter italic uppercase">Configuration</h1>
     <div class="grid xl:grid-cols-2 gap-20">
-        <!-- BRANDING SECTION -->
-        <div class="bg-white p-16 rounded-[5rem] border shadow-2xl space-y-12 relative overflow-hidden">
-            <div class="absolute top-[-50px] left-[-50px] opacity-[0.03] text-indigo-900 pointer-events-none italic font-black text-[250px]">UI</div>
-            <h2 class="text-4xl font-black text-indigo-700 italic border-b-4 border-indigo-50 pb-6 uppercase tracking-tighter relative z-10">Site Identity</h2>
-            <form method="POST" class="space-y-10 relative z-10">
+        <div class="bg-white p-16 rounded-[5rem] border shadow-2xl">
+            <form method="POST" class="space-y-10">
                 <input type="hidden" name="type" value="branding">
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3 mb-4 block">Platform Display Name</label>
-                    <input name="name" value="{{site.name}}" class="w-full font-black text-3xl uppercase tracking-tighter text-indigo-900 bg-slate-50 border-none" required>
-                </div>
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3 mb-4 block">SEO Metadata Browser Title</label>
-                    <input name="title" value="{{site.title}}" class="w-full font-bold bg-slate-50 border-none" required>
-                </div>
-                <div>
-                    <label class="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-3 mb-4 block">Primary Brand Icon URL (PNG/JPG)</label>
-                    <input name="logo" value="{{site.logo}}" class="w-full font-bold bg-slate-50 border-none" required>
-                </div>
-                <button class="btn-main w-full justify-center py-6 rounded-[2.5rem] font-black text-xl shadow-indigo-100 shadow-2xl">UPDATE SITE ASSETS</button>
+                <input name="name" value="{{site.name}}" class="w-full" placeholder="Site Name">
+                <input name="title" value="{{site.title}}" class="w-full" placeholder="Site Title">
+                <input name="logo" value="{{site.logo}}" class="w-full" placeholder="Logo URL">
+                <button class="btn-main w-full justify-center">UPDATE BRANDING</button>
             </form>
         </div>
-        <!-- API SECTION -->
-        <div class="bg-slate-950 p-16 rounded-[5rem] shadow-2xl space-y-12 text-white relative overflow-hidden">
-            <div class="absolute top-[-50px] left-[-50px] opacity-10 text-emerald-400 pointer-events-none italic font-black text-[250px]">API</div>
-            <h2 class="text-4xl font-black text-emerald-400 italic border-b-4 border-slate-900 pb-6 uppercase tracking-tighter relative z-10 underline decoration-emerald-900 decoration-8">Link Gateway</h2>
-            <form method="POST" class="space-y-10 relative z-10">
+        <div class="bg-slate-950 p-16 rounded-[5rem] text-white">
+            <form method="POST" class="space-y-10">
                 <input type="hidden" name="type" value="shortener">
-                <div>
-                    <label class="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-3 mb-4 block">Shortener API Host Domain</label>
-                    <input name="url" value="{{cfg.url}}" placeholder="domain.xyz" class="w-full bg-slate-900 border-2 border-slate-800 text-emerald-400 font-bold text-xl outline-none focus:border-emerald-400 transition shadow-inner" required>
-                </div>
-                <div>
-                    <label class="text-[10px] font-black text-slate-600 uppercase tracking-widest ml-3 mb-4 block">Private API Access Token</label>
-                    <input type="password" name="api" value="{{cfg.api}}" placeholder="Enter Secret API Key" class="w-full bg-slate-900 border-2 border-slate-800 text-emerald-400 font-bold outline-none focus:border-emerald-400 transition shadow-inner" required>
-                </div>
-                <button class="w-full bg-emerald-500 text-slate-950 py-7 rounded-[2.5rem] font-black text-xl uppercase tracking-widest hover:bg-emerald-400 transition shadow-emerald-900 shadow-2xl">CONFIGURE BACKEND REDIRECTION</button>
-                <div class="bg-slate-900 p-8 rounded-3xl border border-slate-800">
-                    <p class="text-[10px] text-slate-500 font-black leading-relaxed uppercase tracking-widest italic">Note: High-speed secure redirection will be automatically applied to all application download triggers across the platform using SSL encryption protocols.</p>
-                </div>
+                <input name="url" value="{{cfg.url}}" placeholder="domain.xyz" class="w-full bg-slate-900 border-slate-800">
+                <input name="api" value="{{cfg.api}}" placeholder="API Key" class="w-full bg-slate-900 border-slate-800">
+                <button class="w-full bg-emerald-500 py-6 rounded-[2rem] text-black font-black">UPDATE API</button>
             </form>
         </div>
     </div>
@@ -690,45 +606,33 @@ def forgot():
     if request.method == 'POST':
         if request.form.get('key') == RECOVERY_KEY:
             users_col.update_one({"username": "admin"}, {"$set": {"password": generate_password_hash(request.form.get('pw'))}}, upsert=True)
-            flash("System Protocol: Administrative master password override successful. Please re-authenticate.")
+            flash("Password updated.")
             return redirect('/admin-gate')
-        flash("CRITICAL: Unauthorized recovery attempt detected. Key mismatch.")
-    
     content = """
-    <div class="max-w-xl mx-auto mt-32 bg-white p-20 rounded-[5rem] shadow-2xl border-8 border-red-50 text-center">
-        <div class="w-24 h-24 bg-red-600 rounded-[2.5rem] mx-auto mb-10 flex items-center justify-center shadow-2xl shadow-red-200">
-            <i class="fas fa-exclamation-triangle text-white text-4xl"></i>
-        </div>
-        <h2 class="text-4xl font-black mb-10 text-red-600 tracking-tighter uppercase italic underline decoration-red-100 decoration-8 underline-offset-8">Master Reset</h2>
+    <div class="max-w-xl mx-auto mt-32 bg-white p-20 rounded-[5rem] shadow-2xl text-center">
         <form method="POST" class="space-y-8">
-            <div>
-                <input name="key" placeholder="SYSTEM RECOVERY TOKEN" class="w-full border-none bg-slate-50 p-6 rounded-[2rem] text-center font-black text-lg outline-none focus:ring-4 ring-red-500/10 uppercase" required>
-            </div>
-            <div>
-                <input type="password" name="pw" placeholder="NEW MASTER PASSCODE" class="w-full border-none bg-slate-50 p-6 rounded-[2rem] text-center font-black text-lg outline-none focus:ring-4 ring-red-500/10 uppercase" required>
-            </div>
-            <button class="bg-red-600 text-white w-full py-7 rounded-[2rem] font-black text-xl shadow-2xl shadow-red-200 hover:bg-slate-900 transition-all uppercase tracking-widest italic">Override Security Credentials</button>
+            <input name="key" placeholder="RECOVERY TOKEN" class="w-full" required>
+            <input type="password" name="pw" placeholder="NEW PASSWORD" class="w-full" required>
+            <button class="bg-red-600 text-white w-full py-7 rounded-[2rem] font-black">RESET NOW</button>
         </form>
     </div>
     """
-    return render_template_string(f"<!DOCTYPE html><html lang='en'><head>{BASE_CSS}</head><body class='bg-slate-100'>{content}</body></html>")
+    return render_template_string(f"<!DOCTYPE html><html><head>{BASE_CSS}</head><body>{content}</body></html>")
 
 @app.route('/del/<type>/<id>')
 def delete_entry(type, id):
     if not session.get('logged_in'): return redirect('/admin-gate')
     if type == 'app': apps_col.delete_one({"_id": ObjectId(id)})
     if type == 'ad': ads_col.delete_one({"_id": ObjectId(id)})
-    flash("Database Synced: Entry purged permanently from server memory.")
+    flash("Deleted successfully.")
     return redirect(request.referrer)
 
 @app.route('/logout')
 def logout():
     session.clear()
-    flash("System Note: Administrative session terminated successfully.")
     return redirect('/')
 
-# --- VERCEL DEPLOYMENT EXPORT ---
-handler = app
-
+# --- DEPLOYMENT HANDLER ---
 if __name__ == '__main__':
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port)
