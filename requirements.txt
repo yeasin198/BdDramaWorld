@@ -2,3 +2,6 @@ flask
 pymongo[srv]
 dnspython
 requests
+werkzeug
+certifi
+gunicorn
